@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data
+data/*.csv
+data/*.xlsx
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.tmp
+
+# Optional: große Daten/Exportdateien (nur falls du sie NICHT versionieren willst)
+# *.xlsx
+# *.xlsm
+# *.xlsb
+# *.csv
+
