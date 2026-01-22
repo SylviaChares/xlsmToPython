@@ -1,5 +1,5 @@
 # =============================================================================
-# Rentenbarwert-Funktionen - Standard und Vektorisierte Version
+# Rentenbarwert-Funktionen - Vektorisierte Version
 # =============================================================================
 """
 Vektorisierte Rentenbarwert-Berechnungen.
@@ -85,7 +85,7 @@ def ae_x_k(alter: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbeta
     return ax_wert - abzug
 
 
-def ae_xn_old(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
+def ae_xn(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
     """
     Berechnet den Barwert einer temporaeren vorschuessigen Leibrente ueber n Jahre
     
@@ -118,7 +118,8 @@ def ae_xn_old(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbe
     
     return barwert
 
-def ae_xn_k_old(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> float:
+
+def ae_xn_k(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> float:
     """
     Berechnet den Barwert einer temporaeren vorschuessigen Leibrente ueber n Jahre  mit k Zahlungen pro Jahr
     
@@ -141,83 +142,11 @@ def ae_xn_k_old(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_
     n = min(MAX_ALTER - alter, n)
     v = diskont(zins)
     
-    axn_wert = ae_xn_old(alter, n, sex, zins, sterbetafel_obj)
+    axn_wert = ae_xn(alter, n, sex, zins, sterbetafel_obj)
     abzug = abzugsglied(zw, zins)
     n_px = npx(alter, n, sex, sterbetafel_obj)
     
     return axn_wert - abzug * (1.0 - n_px * (v ** n))
-
-def ae_xn_vec(setup: dict) -> float:
-    """
-    VEKTORISIERT: Berechnet ae_xn unter Nutzung vorberechneter Vektoren.
-    
-    Diese Funktion ist hochoptimiert und nutzt die von verlaufswerte_setup()
-    vorberechneten Vektoren. Sie vermeidet Schleifen komplett.
-    
-    Formel:
-        ae_xn = sum_{t=0}^{n-1} [tpx * v^t]
-    
-    Args:
-        setup: Dictionary von verlaufswerte_setup() mit:
-               - 'tpx': Ueberlebenswahrscheinlichkeiten
-               - 'v_t': Diskontierungsfaktoren
-               - 'n': Laufzeit
-    
-    Returns:
-        Rentenbarwert
-    
-    Performance:
-        - Einzelner Aufruf: ~2x schneller als ae_xn()
-        - In Kombination mit setup: 50-100x schneller fuer Verlaufswerte
-    
-    Technische Details:
-        Nutzt NumPy's optimierte Vektoroperationen (Element-wise Multiplikation
-        und Summierung). Keine Python-Schleifen!
-    """
-    n = setup['n']
-    
-    # Nutze nur die ersten n Werte (Index 0 bis n-1)
-    tpx = setup['tpx'][:n]
-    v_t = setup['v_t'][:n]
-    
-    # Vektorisierte Berechnung: Element-wise Multiplikation + Summe
-    # sum_{t=0}^{n-1} [tpx[t] * v^t]
-    barwert = np.sum(tpx * v_t)
-    
-    return barwert
-
-def ae_xn_k_vec(setup: dict, zw: int) -> float:
-    """
-    VEKTORISIERT: Berechnet ae_xn_k unter Nutzung vorberechneter Vektoren.
-    
-    Formel:
-        ae_xn_k = ae_xn - abzug(k,i) * [1 - npx * v^n]
-    
-    Args:
-        setup: Dictionary von verlaufswerte_setup()
-        zw: Zahlungsweise
-    
-    Returns:
-        Rentenbarwert mit unterjahrigen Zahlungen
-    """
-    if zw <= 0:
-        return 0.0
-    
-    n = setup['n']
-    zins = setup['zins']
-    
-    # Basis-Rentenbarwert (vektorisiert)
-    axn_wert = ae_xn_vec(setup)
-    
-    # Abzugsglied
-    abzug = abzugsglied(zw, zins)
-    
-    # npx * v^n
-    n_px = setup['tpx'][n]  # Index n enthaelt npx
-    v_n = setup['v_t'][n]    # Index n enthaelt v^n
-    
-    return axn_wert - abzug * (1.0 - n_px * v_n)
-
 
 
 def n_ae_x_k(alter: int, n: int, sex: str, zins: float, k: int,
@@ -273,7 +202,7 @@ def m_ae_xn_k(alter: int, n: int, m: int, sex: str, zins: float, k: int,
     
     v = diskont(zins)
     m_px = npx(alter, m, sex, sterbetafel_obj)
-    axn_k_wert = ae_xn_k_old(alter + m, n-m, sex, zins, k, sterbetafel_obj)
+    axn_k_wert = ae_xn_k(alter + m, n-m, sex, zins, k, sterbetafel_obj)
     
     return m_px * (v ** m) * axn_k_wert
 
@@ -282,9 +211,81 @@ def m_ae_xn_k(alter: int, n: int, m: int, sex: str, zins: float, k: int,
 # Vektorisierte Funktionen (NEU)
 # =============================================================================
 
+def ae_xn_vec(setup: dict) -> float:
+    """
+    VEKTORISIERT: Berechnet ae_xn unter Nutzung vorberechneter Vektoren.
+    
+    Diese Funktion ist hochoptimiert und nutzt die von verlaufswerte_setup()
+    vorberechneten Vektoren. Sie vermeidet Schleifen komplett.
+    
+    Formel:
+        ae_xn = sum_{t=0}^{n-1} [tpx * v^t]
+    
+    Args:
+        setup: Dictionary von verlaufswerte_setup() mit:
+               - 'tpx': Ueberlebenswahrscheinlichkeiten
+               - 'v_t': Diskontierungsfaktoren
+               - 'n': Laufzeit
+    
+    Returns:
+        Rentenbarwert
+    
+    Performance:
+        - Einzelner Aufruf: ~2x schneller als ae_xn()
+        - In Kombination mit setup: 50-100x schneller fuer Verlaufswerte
+    
+    Technische Details:
+        Nutzt NumPy's optimierte Vektoroperationen (Element-wise Multiplikation
+        und Summierung). Keine Python-Schleifen!
+    """
+    n = setup['n']
+    
+    # Nutze nur die ersten n Werte (Index 0 bis n-1)
+    tpx = setup['tpx'][:n]
+    v_t = setup['v_t'][:n]
+    
+    # Vektorisierte Berechnung: Element-wise Multiplikation + Summe
+    # sum_{t=0}^{n-1} [tpx[t] * v^t]
+    barwert = np.sum(tpx * v_t)
+    
+    return barwert
 
 
-def ae_xn_verlauf_vec(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+def ae_xn_k_vec(setup: dict, zw: int) -> float:
+    """
+    VEKTORISIERT: Berechnet ae_xn_k unter Nutzung vorberechneter Vektoren.
+    
+    Formel:
+        ae_xn_k = ae_xn - abzug(k,i) * [1 - npx * v^n]
+    
+    Args:
+        setup: Dictionary von verlaufswerte_setup()
+        zw: Zahlungsweise
+    
+    Returns:
+        Rentenbarwert mit unterjahrigen Zahlungen
+    """
+    if zw <= 0:
+        return 0.0
+    
+    n = setup['n']
+    zins = setup['zins']
+    
+    # Basis-Rentenbarwert (vektorisiert)
+    axn_wert = ae_xn_vec(setup)
+    
+    # Abzugsglied
+    abzug = abzugsglied(zw, zins)
+    
+    # npx * v^n
+    n_px = setup['tpx'][n]  # Index n enthaelt npx
+    v_n = setup['v_t'][n]    # Index n enthaelt v^n
+    
+    return axn_wert - abzug * (1.0 - n_px * v_n)
+
+
+def ae_xn_verlauf_vec(alter: int, n: int, sex: str, zins: float, zw: int,
+                      sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet ALLE Rentenbarwerte ae_{x+t}:n-t fuer t=0..n-1.
     
@@ -479,4 +480,3 @@ ae_xn_verlauf_optimized():
     Zeit: 0.002 Sekunden
     Speedup: 250x
 """
-

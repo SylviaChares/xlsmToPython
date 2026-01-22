@@ -1,5 +1,5 @@
 # =============================================================================
-# Leistungsbarwert-Funktionen - Standard und Vektorisierte Version
+ # Leistungsbarwert-Funktionen - Vektorisierte Version
 # =============================================================================
 """
 Vektorisierte Leistungsbarwert-Berechnungen.
@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import Union, Optional
 
 from .sterbetafel import Sterbetafel, MAX_ALTER
-from .basisfunktionen import diskont, npx, tpx_matrix, diskont_potenz_vec
+from .basisfunktionen import diskont, npx
+from .basisfunktionen import tpx_matrix, diskont_potenz_vec
+
 
 # =============================================================================
 # Skalare Funktionen (Original - unveraendert)

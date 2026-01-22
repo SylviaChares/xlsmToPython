@@ -1,0 +1,289 @@
+Public Const rund_lx As Integer = 16
+Public Const rund_tx As Integer = 16
+Public Const rund_Dx As Integer = 16
+Public Const rund_Cx As Integer = 16
+Public Const rund_Nx As Integer = 16
+Public Const rund_Mx As Integer = 16
+Public Const rund_Rx As Integer = 16
+Public Const max_Alter As Integer = 121
+
+Public Function Act_qx(Alter As Integer, Sex As String, Tafel As String) As Double
+   Dim ws As Worksheet
+   Dim sTafelvektor As String
+    
+    Set ws = ThisWorkbook.Worksheets("Tafeln")
+    If UCase(Sex) <> "M" Then Sex = "F"
+    
+   Select Case UCase(Tafel)    ' Prüfen, ob Tafelstring überhaupt implementiert ist
+        ' hier muss die komplette Liste aller implementierten Tafeln angegeben werden
+      Case "DAV1994_T", "DAV2008_T"
+               sTafelvektor = UCase(Tafel) & "_" & Sex
+               Act_qx = WorksheetFunction.Index(ws.Range("m_Tafeln"), Alter + 1, WorksheetFunction.Match(sTafelvektor, ws.Range("v_Tafeln"), 0))
+      Case Else
+         Act_qx = 1#
+         Error (1)
+   End Select
+
+End Function
+
+
+Private Function v_lx(Endalter As Integer, Sex As String, Tafel As String) As Variant
+   ' erzeugt Vektor der lx
+   ' falls Endalter = -1 dann wird bis max_Alter erzeugt
+   Dim vek() As Variant
+   Dim i As Integer
+   Dim Grenze As Integer
+
+   If Endalter = -1 Then
+      Grenze = max_Alter
+   Else
+      Grenze = Endalter
+   End If
+
+   ReDim vek(Grenze)
+
+   vek(0) = 1000000
+   For i = 1 To Grenze
+      vek(i) = vek(i - 1) * (1 - Act_qx(i - 1, Sex, Tafel))
+      vek(i) = WorksheetFunction.Round(vek(i), rund_lx)
+   Next i
+   v_lx = vek()
+End Function
+
+Public Function Act_lx(Alter As Integer, Sex As String, Tafel As String) As Double
+   Dim vek As Variant
+   
+   vek = v_lx(Alter, Sex, Tafel)
+   Act_lx = vek(Alter)
+End Function
+
+
+Private Function v_tx(Endalter As Integer, Sex As String, Tafel As String) As Variant
+    ' erzeugt Vektor der tx (#Tote)
+    Dim vek() As Variant
+    Dim i As Integer
+    
+    Dim Grenze As Integer
+    
+    If Endalter = -1 Then
+        Grenze = max_Alter
+    Else
+        Grenze = Endalter
+    End If
+    
+    ReDim vek(Grenze)
+    Dim v_Temp_lx As Variant
+    v_Temp_lx = v_lx(Grenze, Sex, Tafel)
+        
+    For i = 0 To Grenze - 1
+        vek(i) = v_Temp_lx(i) - v_Temp_lx(i + 1)
+        vek(i) = WorksheetFunction.Round(vek(i), rund_tx)
+    Next i
+    v_tx = vek()
+End Function
+
+Public Function Act_tx(Alter As Integer, Sex As String, Tafel As String) As Double
+   Dim vek As Variant
+   vek = v_tx(Alter, Sex, Tafel)
+   Act_tx = vek(Alter)
+End Function
+
+Private Function v_Dx(Endalter As Integer, Sex As String, Tafel As String, Zins As Double) As Variant
+    ' erzeugt Vektor der Dx
+    Dim vek() As Variant
+    Dim i As Integer
+    
+    Dim Grenze As Integer
+    
+    If Endalter = -1 Then
+        Grenze = max_Alter
+    Else
+        Grenze = Endalter
+    End If
+    
+    ReDim vek(Grenze)
+    Dim v As Double
+    v = 1 / (1 + Zins)
+    
+    Dim v_Temp_lx As Variant
+    v_Temp_lx = v_lx(Grenze, Sex, Tafel)
+            
+    For i = 0 To Grenze
+        vek(i) = v_Temp_lx(i) * v ^ i
+        vek(i) = WorksheetFunction.Round(vek(i), rund_Dx)
+    Next i
+    v_Dx = vek()
+End Function
+
+Public Function Act_Dx(Alter As Integer, Sex As String, Tafel As String, Zins As Double) As Double
+    Dim vek As Variant
+    vek = v_Dx(Alter, Sex, Tafel, Zins)
+    Act_Dx = vek(Alter)
+End Function
+
+Private Function v_Cx(Endalter As Integer, Sex As String, Tafel As String, Zins As Double) As Variant
+    ' erzeugt Vektor der Cx
+    Dim vek() As Variant
+    Dim i As Integer
+    
+    Dim Grenze As Integer
+    
+    If Endalter = -1 Then
+        Grenze = max_Alter
+    Else
+        Grenze = Endalter
+    End If
+    
+    ReDim vek(Grenze)
+    Dim v As Double
+    v = 1 / (1 + Zins)
+    
+    Dim v_Temp_tx As Variant
+    v_Temp_tx = v_tx(Grenze, Sex, Tafel)
+            
+    For i = 0 To Grenze - 1
+        vek(i) = v_Temp_tx(i) * v ^ (i + 1)
+        vek(i) = WorksheetFunction.Round(vek(i), rund_Cx)
+    Next i
+    v_Cx = vek()
+End Function
+
+Public Function Act_Cx(Alter As Integer, Sex As String, Tafel As String, Zins As Double) As Double
+    Dim vek As Variant
+    vek = v_Cx(Alter, Sex, Tafel, Zins)
+    Act_Cx = vek(Alter)
+End Function
+
+Private Function v_Nx(Sex As String, Tafel As String, Zins As Double) As Variant
+    ' erzeugt Vektor der Nx
+    Dim vek() As Variant
+    Dim i As Integer
+    ReDim vek(max_Alter)
+    
+    Dim v_Temp_Dx As Variant
+    v_Temp_Dx = v_Dx(-1, Sex, Tafel, Zins)
+            
+    vek(max_Alter) = v_Temp_Dx(max_Alter)
+    For i = max_Alter - 1 To 0 Step -1
+        vek(i) = vek(i + 1) + v_Temp_Dx(i)
+        vek(i) = WorksheetFunction.Round(vek(i), rund_Dx)
+    Next i
+    v_Nx = vek()
+End Function
+
+Public Function Act_Nx(Alter As Integer, Sex As String, Tafel As String, Zins As Double) As Double
+    Dim vek As Variant
+    vek = v_Nx(Sex, Tafel, Zins)
+    Act_Nx = vek(Alter)
+End Function
+
+Private Function v_Mx(Sex As String, Tafel As String, Zins As Double) As Variant
+    ' erzeugt Vektor der Mx
+    Dim vek() As Variant
+    Dim i As Integer
+    ReDim vek(max_Alter)
+    
+    Dim v_Temp_Cx As Variant
+    v_Temp_Cx = v_Cx(-1, Sex, Tafel, Zins)
+            
+    vek(max_Alter) = v_Temp_Cx(max_Alter)
+    For i = max_Alter - 1 To 0 Step -1
+        vek(i) = vek(i + 1) + v_Temp_Cx(i)
+        vek(i) = WorksheetFunction.Round(vek(i), rund_Mx)
+    Next i
+    v_Mx = vek()
+End Function
+
+Public Function Act_Mx(Alter As Integer, Sex As String, Tafel As String, Zins As Double) As Double
+    Dim vek As Variant
+    vek = v_Mx(Sex, Tafel, Zins)
+    Act_Mx = vek(Alter)
+End Function
+
+Private Function v_Rx(Sex As String, Tafel As String, Zins As Double) As Variant
+    ' erzeugt Vektor der Rx
+    Dim vek() As Variant
+    Dim i As Integer
+    ReDim vek(max_Alter)
+    
+    Dim v_Temp_Mx As Variant
+    v_Temp_Mx = v_Mx(Sex, Tafel, Zins)
+            
+    vek(max_Alter) = v_Temp_Mx(max_Alter)
+    For i = max_Alter - 1 To 0 Step -1
+        vek(i) = vek(i + 1) + v_Temp_Mx(i)
+        vek(i) = WorksheetFunction.Round(vek(i), rund_Rx)
+    Next i
+    v_Rx = vek()
+End Function
+
+Public Function Act_Rx(Alter As Integer, Sex As String, Tafel As String, Zins As Double) As Double
+    Dim vek As Variant
+    vek = v_Rx(Sex, Tafel, Zins)
+    Act_Rx = vek(Alter)
+End Function
+
+
+Public Function Act_ax_k(Alter As Integer, Sex As String, Tafel As String, Zins As Double, k As Integer) As Double
+   If k > 0 Then
+      Act_ax_k = Act_Nx(Alter, Sex, Tafel, Zins) / Act_Dx(Alter, Sex, Tafel, Zins) - Act_Abzugsglied(k, Zins)
+   Else
+      Act_ax_k = 0
+   End If
+End Function
+
+Public Function Act_axn_k(Alter As Integer, n As Integer, Sex As String, Tafel As String, Zins As Double, k As Integer) As Double
+   If k > 0 Then
+      Act_axn_k = (Act_Nx(Alter, Sex, Tafel, Zins) - Act_Nx(Alter + n, Sex, Tafel, Zins)) / Act_Dx(Alter, Sex, Tafel, Zins) - Act_Abzugsglied(k, Zins) * (1 - Act_Dx(Alter + n, Sex, Tafel, Zins) / Act_Dx(Alter, Sex, Tafel, Zins))
+   Else
+      Act_axn_k = 0
+   End If
+End Function
+
+Public Function Act_nax_k(Alter As Integer, n As Integer, Sex As String, Tafel As String, Zins As Double, k As Integer) As Double
+   If k > 0 Then
+      Act_nax_k = Act_Dx(Alter + n, Sex, Tafel, Zins) / Act_Dx(Alter, Sex, Tafel, Zins) * Act_ax_k(Alter + n, Sex, Tafel, Zins, k)
+   Else
+      Act_nax_k = 0
+   End If
+End Function
+
+Public Function Act_nGrAx(Alter As Integer, n As Integer, Sex As String, Tafel As String, Zins As Double) As Double
+   Act_nGrAx = (Act_Mx(Alter, Sex, Tafel, Zins) - Act_Mx(Alter + n, Sex, Tafel, Zins)) / Act_Dx(Alter, Sex, Tafel, Zins)
+
+End Function
+
+Public Function Act_nGrEx(Alter As Integer, n As Integer, Sex As String, Tafel As String, Zins As Double) As Double
+   Act_nGrEx = Act_Dx(Alter + n, Sex, Tafel, Zins) / Act_Dx(Alter, Sex, Tafel, Zins)
+
+End Function
+
+Public Function Act_ag_k(g As Integer, Zins As Double, k As Integer) As Double
+   Dim v As Double
+   v = 1 / (1 + Zins)
+   If k > 0 Then
+      If Zins > 0 Then
+         Act_ag_k = (1 - v ^ g) / (1 - v) - Act_Abzugsglied(k, Zins) * (1 - v ^ g)
+      Else
+         Act_ag_k = g
+      End If
+   Else
+      Act_ag_k = 0
+   End If
+End Function
+
+
+Public Function Act_Abzugsglied(k As Integer, Zins As Double) As Double
+   ' Abzugsglied
+   Dim l As Integer
+   Act_Abzugsglied = 0
+   If k > 0 Then
+      For l = 0 To k - 1
+         Act_Abzugsglied = Act_Abzugsglied + l / k / (1 + l / k * Zins)
+      Next l
+      Act_Abzugsglied = Act_Abzugsglied * (1 + Zins) / k
+   End If
+
+End Function
+
+

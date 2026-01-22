@@ -130,12 +130,14 @@ def nqx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
 # Vektorisierte Funktionen (NEU)
 # =============================================================================
 
-def npx_vec(alter_array: np.ndarray, n_array: np.ndarray, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+def npx_vec(alter_array: np.ndarray, n_array: np.ndarray, sex: str, 
+            sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet n-jahrige Ueberlebenswahrscheinlichkeiten fuer Arrays.
     
-    Diese Funktion berechnet npx fuer mehrere (Alter, Laufzeit)-Kombinationen 
-    gleichzeitig, was deutlich effizienter ist als eine Schleife ueber Einzelberechnungen.
+    Diese Funktion berechnet npx fuer mehrere (Alter, Laufzeit)-Kombinationen
+    gleichzeitig, was deutlich effizienter ist als eine Schleife ueber
+    Einzelberechnungen.
     
     Args:
         alter_array: NumPy-Array mit Startaltern
@@ -186,7 +188,8 @@ def npx_vec(alter_array: np.ndarray, n_array: np.ndarray, sex: str, sterbetafel_
     return result
 
 
-def tpx_matrix(alter: int, max_t: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+def tpx_matrix(alter: int, max_t: int, sex: str, 
+               sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet Matrix aller tpx-Werte fuer t = 0, 1, ..., max_t.
     
@@ -300,7 +303,8 @@ def diskont_potenz_vec(zins: float, t_array: np.ndarray) -> np.ndarray:
 # Hilfsfunktionen fuer effiziente Verlaufswerte-Berechnung
 # =============================================================================
 
-def verlaufswerte_setup(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> dict:
+def verlaufswerte_setup(alter: int, n: int, sex: str, zins: float,
+                       sterbetafel_obj: Sterbetafel) -> dict:
     """
     Bereitet alle benoetigten Vektoren fuer Verlaufswerte-Berechnung vor.
     

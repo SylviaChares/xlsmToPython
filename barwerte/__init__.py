@@ -35,8 +35,8 @@ from .basisfunktionen import (
 from .rentenbarwerte import (
     ae_x,           # Lebenslanger Rentenbarwert
     ae_x_k,         # Lebenslanger Rentenbarwert mit k Zahlungen pro Jahr
-    ae_xn,          # Rentenbarwert mit Dauer n
-    ae_xn_k,        # Rentenbarwert mit Dauer n mit k Zahlungen pro Jahr
+    ae_xn_old,      # Rentenbarwert mit Dauer n
+    ae_xn_k_old,    # Rentenbarwert mit Dauer n mit k Zahlungen pro Jahr
     n_ae_x_k,       # Um n Jahre aufgeschobener Rentenbarwert mit k Zahlungen pro Jahr
     m_ae_xn_k       # Um m Jahre aufgeschobener Rentenbarwert mit Dauer n mit k Zahlungen pro Jahr
 )
@@ -70,8 +70,8 @@ __all__ = [
     # Rentenbarwerte
     'ae_x',
     'ae_x_k',
-    'ae_xn',
-    'ae_xn_k',
+    'ae_xn_old',
+    'ae_xn_k_old',
     'n_ae_x_k',
     'm_ae_xn_k',
     
