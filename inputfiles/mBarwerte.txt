@@ -1,4 +1,3 @@
-Attribute VB_Name = "mBarwerte"
 '===============================================================================
 ' Modul: mBarwerte
 ' Zweck: Berechnung versicherungsmathematischer Barwerte direkt aus qx-Werten

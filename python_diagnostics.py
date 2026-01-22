@@ -99,7 +99,8 @@ def check_important_packages():
         'torch',
         'jupyter',
         'notebook',
-        'ipykernel'
+        'ipykernel',
+        'openpyxl'
     ]
     
     print("Status wichtiger Data Science Packages:\n")
