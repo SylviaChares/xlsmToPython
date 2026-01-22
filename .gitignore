@@ -24,7 +24,7 @@ ENV/
 *.swo
 
 # Data
-data/*.csv
+# data/*.csv
 data/*.xlsx
 *.db
 
