@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Union, Optional
 
 from .sterbetafel import Sterbetafel, MAX_ALTER
-from .basisfunktionen import diskont, npx, tpx_matrix, diskont_potenz_vec
+from .basisfunktionen import diskont, npx_skalar, tpx_matrix, diskont_potenz_vec
 
 # =============================================================================
 # Skalare Funktionen (Original - unveraendert)
@@ -75,7 +75,7 @@ def nE_x(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel
         return 1.0
     
     v = diskont(zins)
-    n_px = npx(alter, n, sex, sterbetafel_obj)
+    n_px = npx_skalar(alter, n, sex, sterbetafel_obj)
     
     return n_px * (v ** n)
 
@@ -327,7 +327,7 @@ def nE_x_verlauf_vec(alter: int, n: int, sex: str, zins: float,
             # (n-t)p_{x+t} = tp_x / tpx[t]  wo tp_x = npx von x aus
             # 
             # Aber einfacher: Berechne direkt via npx
-            n_t_px = npx(alter + t, restlaufzeit, sex, sterbetafel_obj)
+            n_t_px = npx_skalar(alter + t, restlaufzeit, sex, sterbetafel_obj)
             
             erlebensfallbarwerte[t] = n_t_px * (v ** restlaufzeit)
     
@@ -339,7 +339,7 @@ def nE_x_verlauf_optimized(alter: int, n: int, sex: str, zins: float,
     """
     ULTRA-OPTIMIERT: Berechnet Erlebensfallbarwert-Verlauf mit minimalem Overhead.
     
-    Diese Version vermeidet wiederholte npx()-Aufrufe durch clevere Nutzung
+    Diese Version vermeidet wiederholte npx_old()-Aufrufe durch clevere Nutzung
     der Struktur von Ueberlebenswahrscheinlichkeiten.
     
     Algorithmus:

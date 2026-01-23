@@ -78,7 +78,7 @@ def abzugsglied(zw: int, zins: float) -> float:
     return abzug
 
 
-def npx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
+def npx_skalar(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
     """
     Berechnet n-jahrige Ueberlebenswahrscheinlichkeit: npx
     
@@ -99,8 +99,7 @@ def npx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
     px_werte = sterbetafel_obj.px_vec(alter, n, sex)
     return np.prod(px_werte)
 
-
-def nqx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
+def nqx_skalar(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
     """
     Berechnet n-jahrige Sterbewahrscheinlichkeit: nqx
     
@@ -121,69 +120,69 @@ def nqx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
     if n == 1:
         return sterbetafel_obj.qx(alter, sex)
     else:
-        n_minus_1_px = npx(alter, n - 1, sex, sterbetafel_obj)
+        n_minus_1_px = npx_skalar(alter, n - 1, sex, sterbetafel_obj)
         qx_wert = sterbetafel_obj.qx(alter + n - 1, sex)
         return n_minus_1_px * qx_wert
 
 
-# =============================================================================
-# Vektorisierte Funktionen (NEU)
-# =============================================================================
 
-def npx_vec(alter_array: np.ndarray, n_array: np.ndarray, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+def npx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
-    VEKTORISIERT: Berechnet n-jahrige Ueberlebenswahrscheinlichkeiten fuer Arrays.
+    Berechnet n-jahrige Ueberlebenswahrscheinlichkeit: npx
     
-    Diese Funktion berechnet npx fuer mehrere (Alter, Laufzeit)-Kombinationen 
-    gleichzeitig, was deutlich effizienter ist als eine Schleife ueber Einzelberechnungen.
-    
-    Args:
-        alter_array: NumPy-Array mit Startaltern
-        n_array: NumPy-Array mit Laufzeiten (gleiche Laenge wie alter_array)
-        sex: Geschlecht ('M' oder 'F')
-        sterbetafel_obj: Sterbetafel-Objekt
-    
-    Returns:
-        NumPy-Array mit n-jahrigen Ueberlebenswahrscheinlichkeiten
-    
-    Beispiel:
-        >>> alter_arr = np.array([40, 41, 42])
-        >>> n_arr = np.array([20, 19, 18])
-        >>> npx_values = npx_vec(alter_arr, n_arr, 'M', st)
-    
-    Performance:
-        - Fuer 100 Berechnungen: ~10x schneller als Schleife
-        - Fuer 1000 Berechnungen: ~50x schneller
+    Formel: npx = px * px+1 * ... * px+n-1 = npx = (1-qx) * (1-qx+1) * ... * (1-qx+n-1)
     """
-    # Validierung
-    if not isinstance(alter_array, np.ndarray):
-        alter_array = np.array(alter_array)
-    if not isinstance(n_array, np.ndarray):
-        n_array = np.array(n_array)
+    if n <= 0 or alter + n > MAX_ALTER:
+        return np.array([])
     
-    if alter_array.shape != n_array.shape:
-        raise ValueError(
-            f"alter_array und n_array muessen gleiche Form haben. "
-            f"Erhalten: {alter_array.shape} vs {n_array.shape}"
-        )
+    n = min(MAX_ALTER - alter, n)
     
-    # Ergebnis-Array initialisieren
-    result = np.ones_like(alter_array, dtype=float)
+    # Alle qx-Werte auf einmal holen
+    qx_all = sterbetafel_obj.qx_vec(alter, n, sex)
+    px_all = 1.0 - qx_all
+
+    # Ergebnis-Array
+    n_j_px = np.zeros(n+1, dtype=float)
     
-    # Berechne npx fuer jede Kombination
-    # OPTIMIERUNG: Nutze Broadcasting und kumulative Produkte
-    for i in range(len(alter_array)):
-        alter_i = int(alter_array[i])
-        n_i = int(n_array[i])
-        
-        if n_i <= 0 or alter_i + n_i >= MAX_ALTER:
-            result[i] = 1.0
+    # Berechne fuer jedes m
+    for j in range(n+1):
+        # px-Werte 
+        px_slice = np.append([1.0], px_all[0:j][:j])
+
+        # tpx via kumulative Produkte
+        jpx_values = np.ones(j+2)
+        jpx_values[1:] = np.cumprod(px_slice)
+        n_j_px[j] = jpx_values[j+1]
+
+    return n_j_px
+
+def nqx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+    """
+    Berechnet n-jahrige Sterbewahrscheinlichkeit: nqx
+    
+    Formel: nqx = (n-1)px * qx+n-1
+    """
+    if n <= 0 or alter + n > MAX_ALTER:
+        return np.array([])
+    
+    n = min(MAX_ALTER - alter, n)
+    
+    # Alle qx-Werte auf einmal holen
+    qx_all = sterbetafel_obj.qx_vec(alter-1, n+1, sex)
+    npx_all = npx(alter, n, sex, sterbetafel_obj)
+
+    # Ergebnis-Array
+    n_j_qx = np.zeros(n+1, dtype=float)
+    
+    # Berechne fuer jedes m
+    for j in range(n+1):
+        # qx-Werte 
+        if j == 0:
+             n_j_qx[j] = qx_all[j]
         else:
-            # Hole px-Vektor fuer diese Kombination
-            px_werte = sterbetafel_obj.px_vec(alter_i, n_i, sex)
-            result[i] = np.prod(px_werte)
-    
-    return result
+            n_j_qx[j] = qx_all[j] * npx_all[j-1]
+
+    return n_j_qx
 
 
 def tpx_matrix(alter: int, max_t: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
@@ -242,6 +241,7 @@ def tpx_matrix(alter: int, max_t: int, sex: str, sterbetafel_obj: Sterbetafel) -
     return tpx_values
 
 
+
 def diskont_vec(zins_array: np.ndarray) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet Diskontierungsfaktoren fuer Array von Zinssaetzen.
@@ -265,7 +265,6 @@ def diskont_vec(zins_array: np.ndarray) -> np.ndarray:
     result[mask] = 1.0 / (1.0 + zins_array[mask])
     
     return result
-
 
 def diskont_potenz_vec(zins: float, t_array: np.ndarray) -> np.ndarray:
     """
