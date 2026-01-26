@@ -48,17 +48,17 @@ try:
     from barwerte import leistungsbarwerte as lbw    
     from barwerte import basisfunktionen as bf
     
-    # Versuche vektorisierte Funktionen zu importieren
-    try:
-        from barwerte.rentenbarwerte import ae_xn_verlauf_vec, ae_xn_k, m_ae_xn_k
-        from barwerte.leistungsbarwerte import nAe_x_verlauf_vec, nE_x_verlauf_vec, nE_x_verlauf_optimized
-        VECTORIZED_AVAILABLE = True
-        print("\n✓ Vektorisierte Funktionen verfuegbar")
-    except ImportError as e:
-        VECTORIZED_AVAILABLE = False
-        print(f"\n✗ Vektorisierte Funktionen NICHT verfuegbar: {e}")
-        print("  Bitte stelle sicher, dass die vektorisierten Funktionen")
-        print("  zu den barwerte-Modulen hinzugefuegt wurden.")
+#    # Versuche vektorisierte Funktionen zu importieren
+#    try:
+#        from barwerte.rentenbarwerte import ae_xn_verlauf_vec, ae_xn_k, m_ae_xn_k
+#        from barwerte.leistungsbarwerte import nAe_x_verlauf_vec, nE_x_verlauf_vec, nE_x_verlauf_optimized
+#        VECTORIZED_AVAILABLE = True
+#        print("\n✓ Vektorisierte Funktionen verfuegbar")
+#    except ImportError as e:
+#        VECTORIZED_AVAILABLE = False
+#        print(f"\n✗ Vektorisierte Funktionen NICHT verfuegbar: {e}")
+#        print("  Bitte stelle sicher, dass die vektorisierten Funktionen")
+#        print("  zu den barwerte-Modulen hinzugefuegt wurden.")
         
 except ImportError as e:
     print(f"\nFEHLER beim Import: {e}")
@@ -174,8 +174,8 @@ def test_1_berechnung(st: Sterbetafel):
 
 def test_2_berechnung(st: Sterbetafel) -> Dict[str, np.ndarray]:
     print("\n" + "=" * 80)
-    print("Test 2: Test einzelner Funktionen mit Rückgabe Verktor")
-    print("=" * 80)
+#    print("Test 2: Test einzelner Funktionen mit Rückgabe Verktor")
+#    print("=" * 80)
     print(f"\nParameter: Alter={CONFIG.alter}, Sex={CONFIG.sex}, n={CONFIG.n}, t={CONFIG.t}, Tafel={CONFIG.tafel}, Zins={CONFIG.zins:.4%}")
 
     start_time = time.time()
@@ -188,7 +188,7 @@ def test_2_berechnung(st: Sterbetafel) -> Dict[str, np.ndarray]:
 
     nE_x_opt = lbw.nE_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
     nAe_x_opt = lbw.nAe_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
-#    Ae_xn_opt = lbw.Ae_xn(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    Ae_xn_opt = lbw.Ae_xn(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
 
     elapsed = time.time() - start_time
     
@@ -201,15 +201,16 @@ def test_2_berechnung(st: Sterbetafel) -> Dict[str, np.ndarray]:
 #        'Ae_xn_opt': Ae_xn_opt,
         'zeit': elapsed
     }
+
+    wert = rbw.ae_xn_k_val(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, CONFIG.zw, st)
+    print(f"\n wert:")
+    print(f"  wert = {wert}")
     
-    print(f"\n✓ Berechnung abgeschlossen")
-    print(f"  Berechnungszeit: {elapsed:.6f} Sekunden")
+#    print(f"\n✓ Berechnung abgeschlossen")
+#    print(f"  Berechnungszeit: {elapsed:.6f} Sekunden")
 
-    print(f"\n tpx:")
-    print(f"  tpx = {tpx}")
-
-    print("\n" + "=" * 80)
-    print("Test 2: abgeschlossen")
+#    print("\n" + "=" * 80)
+#    print("Test 2: abgeschlossen")
     print("=" * 80)    
     
     return results

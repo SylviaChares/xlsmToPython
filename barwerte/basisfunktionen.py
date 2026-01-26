@@ -21,9 +21,6 @@ from typing import Union, Optional
 from .sterbetafel import Sterbetafel, MAX_ALTER
 
 
-# =============================================================================
-# Skalare Funktionen (Original - bleiben unveraendert)
-# =============================================================================
 
 def diskont(zins: float) -> float:
     """
@@ -40,66 +37,23 @@ def diskont(zins: float) -> float:
     else:
         return 1.0
 
-def diskont_vec(zins_array: np.ndarray) -> np.ndarray:
+def diskont_vec(zins: float, t: int) -> np.ndarray:
     """
-    VEKTORISIERT: Berechnet Diskontierungsfaktoren fuer Array von Zinssaetzen.
-    
-    Args:
-        zins_array: NumPy-Array mit Zinssaetzen
-    
-    Returns:
-        NumPy-Array mit Diskontierungsfaktoren
-    
-    Beispiel:
-        >>> zinsen = np.array([0.01, 0.015, 0.02, 0.025])
-        >>> v_values = diskont_vec(zinsen)
-    """
-    if not isinstance(zins_array, np.ndarray):
-        zins_array = np.array(zins_array)
-    
-    # Behandle Sonderfall zins = 0
-    result = np.ones_like(zins_array, dtype=float)
-    mask = zins_array > 0
-    result[mask] = 1.0 / (1.0 + zins_array[mask])
-    
-    return result
-
-def diskont_potenz_vec(zins: float, t_array: np.ndarray) -> np.ndarray:
-    """
-    VEKTORISIERT: Berechnet v^t fuer Array von t-Werten.
-    
-    Diese Funktion ist optimiert fuer die Barwert-Berechnung, bei der
-    v^0, v^1, v^2, ..., v^n benoetigt werden.
+    Berechnet v^t fuer Array von t-Werten.
     
     Args:
         zins: Zinssatz (skalar)
-        t_array: NumPy-Array mit Zeitpunkten
+        n: Laufzeit
     
     Returns:
         NumPy-Array mit v^t-Werten
-    
-    Beispiel:
-        >>> t = np.arange(21)  # 0, 1, 2, ..., 20
-        >>> v_t = diskont_potenz_vec(0.0175, t)
-    
-    Performance:
-        - Nutzt NumPy's optimierte Potenzierung
-        - ~50x schneller als Python-Schleife fuer grosse Arrays
     """
-    if not isinstance(t_array, np.ndarray):
-        t_array = np.array(t_array)
-    
-    v = diskont(zins)
-    return v ** t_array
+    return diskont(zins) ** np.arange(t)
 
-
-
-def abzugsglied(zw: int, zins: float) -> float:
+def abzugsglied(k: int, zins: float) -> float:
     """
-    Berechnet Abzugsglied fuer unterjahrige Zahlungen (Woolhouse-Naeherung 1. Ordnung).
-    
-    Formel: abzug(k,i) = (1+i)/k * sum_{w=0}^{k-1} [(w/k) / (1 + (w/k)*i)]
-    
+    Berechnet Abzugsglied fuer unterjahrige Zahlungen (Woolhouse-Naeherung 1. Ordnung).    
+    Formel: abzug(k,i) = (1+i)/k * sum_{w=0}^{k-1} [(w/k) / (1 + (w/k)*i)]    
     Vereinfachte Naeherung: abzug(k,i) ≈ (k-1)/(2*k)
     
     Spezialfaelle:
@@ -109,76 +63,26 @@ def abzugsglied(zw: int, zins: float) -> float:
         k=12 (monatlich): abzug ≈ 0,4583
     
     Args:
-        zw: Zahlungsweise (1=jaehrlich, 2=halbjaehrlich, 4=vierteljaehrlich, 12=monatlich)
+        k: Zahlungsweise (1=jaehrlich, 2=halbjaehrlich, 4=vierteljaehrlich, 12=monatlich)
         zins: Jaehrlicher Zinssatz
     
     Returns:
         Abzugsglied
     """
 
-    if zw <= 0 or zw == 1:
+    if k <= 0 or k == 1:
         return 0.0
     
-    if zw not in [1, 2, 4, 12]:
+    if k not in [1, 2, 4, 12]:
         return 0.0
     
     abzug = 0.0
-    for w in range(zw):
-        abzug += (w / zw) / (1.0 + (w / zw) * zins)
+    for w in range(k):
+        abzug += (w / k) / (1.0 + (w / k) * zins)
     
-    abzug *= (1.0 + zins) / zw
+    abzug *= (1.0 + zins) / k
     
     return abzug
-
-
-
-def npx_skalar(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
-    """
-    Berechnet n-jahrige Ueberlebenswahrscheinlichkeit: npx
-    
-    Formel: npx = px * px+1 * ... * px+n-1 = npx = (1-qx) * (1-qx+1) * ... * (1-qx+n-1)
-    
-    Args:
-        alter: Startalter
-        n: Anzahl Jahre
-        sex: Geschlecht ('M' oder 'F')
-        sterbetafel_obj: Sterbetafel-Objekt
-    
-    Returns:
-        n-jahrige Ueberlebenswahrscheinlichkeit
-    """
-    if n <= 0 or alter + n >= MAX_ALTER:
-        return 1.0
-    
-    px_werte = sterbetafel_obj.px_vec(alter, n, sex)
-    return np.prod(px_werte)
-
-def nqx_skalar(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
-    """
-    Berechnet n-jahrige Sterbewahrscheinlichkeit: nqx
-    
-    Formel: nqx = (n-1)px * qx+n-1
-    
-    Args:
-        alter: Startalter
-        n: Anzahl Jahre
-        sex: Geschlecht ('M' oder 'F')
-        sterbetafel_obj: Sterbetafel-Objekt
-    
-    Returns:
-        n-jahrige Sterbewahrscheinlichkeit
-    """
-    if n <= 0 or alter + n >= MAX_ALTER:
-        return 0.0
-    
-    if n == 1:
-        return sterbetafel_obj.qx(alter, sex)
-    else:
-        n_minus_1_px = npx_skalar(alter, n - 1, sex, sterbetafel_obj)
-        qx_wert = sterbetafel_obj.qx(alter + n - 1, sex)
-        return n_minus_1_px * qx_wert
-
-
 
 def npx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
@@ -238,8 +142,6 @@ def nqx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarra
 
     return n_j_qx
 
-
-
 def tpx_matrix(alter: int, max_t: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet Matrix aller tpx-Werte fuer t = 0, 1, ..., max_t.
@@ -297,10 +199,61 @@ def tpx_matrix(alter: int, max_t: int, sex: str, sterbetafel_obj: Sterbetafel) -
 
 
 
+# =======================================================================================================================
+# Backup Funktionen
+# =======================================================================================================================
 
-# =============================================================================
-# Hilfsfunktionen fuer effiziente Verlaufswerte-Berechnung
-# =============================================================================
+# Skalare Funktionen
+def npx_val(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
+    """
+    Berechnet n-jahrige Ueberlebenswahrscheinlichkeit: npx    
+    Formel: npx = px * px+1 * ... * px+n-1 = npx = (1-qx) * (1-qx+1) * ... * (1-qx+n-1)
+    
+    Args:
+        alter: Startalter
+        n: Anzahl Jahre
+        sex: Geschlecht ('M' oder 'F')
+        sterbetafel_obj: Sterbetafel-Objekt
+    
+    Returns:
+        n-jahrige Ueberlebenswahrscheinlichkeit
+    """
+    if n <= 0 or alter + n >= MAX_ALTER:
+        return 1.0
+    
+    px_werte = sterbetafel_obj.px_vec(alter, n, sex)
+    return np.prod(px_werte)
+
+def nqx_val(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
+    """
+    Berechnet n-jahrige Sterbewahrscheinlichkeit: nqx
+    
+    Formel: nqx = (n-1)px * qx+n-1
+    
+    Args:
+        alter: Startalter
+        n: Anzahl Jahre
+        sex: Geschlecht ('M' oder 'F')
+        sterbetafel_obj: Sterbetafel-Objekt
+    
+    Returns:
+        n-jahrige Sterbewahrscheinlichkeit
+    """
+    if n <= 0 or alter + n >= MAX_ALTER:
+        return 0.0
+    
+    if n == 1:
+        return sterbetafel_obj.qx(alter, sex)
+    else:
+        n_minus_1_px = npx_val(alter, n - 1, sex, sterbetafel_obj)
+        qx_wert = sterbetafel_obj.qx(alter + n - 1, sex)
+        return n_minus_1_px * qx_wert
+
+
+
+# =======================================================================================================================
+# Backup: Hilfsfunktionen fuer effiziente Verlaufswerte-Berechnung
+# =======================================================================================================================
 
 def verlaufswerte_setup(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> dict:
     """
@@ -346,7 +299,7 @@ def verlaufswerte_setup(alter: int, n: int, sex: str, zins: float, sterbetafel_o
     px_values = sterbetafel_obj.px_vec(alter, n, sex)
     
     # Diskontierungsfaktoren
-    v_t_values = diskont_potenz_vec(zins, t_array)
+    v_t_values = diskont_vec(zins, t_array)
     
     return {
         'tpx': tpx_values,
@@ -362,44 +315,3 @@ def verlaufswerte_setup(alter: int, n: int, sex: str, zins: float, sterbetafel_o
     }
 
 
-# =============================================================================
-# Performance-Hinweise
-# =============================================================================
-"""
-WANN WELCHE FUNKTION VERWENDEN?
-
-1. EINZELNE Berechnung:
-   - Nutze skalare Funktionen: npx(), diskont()
-   - Kein Performance-Unterschied
-   
-2. WENIGE Berechnungen (< 10):
-   - Nutze skalare Funktionen
-   - Overhead der Vektorisierung lohnt sich nicht
-   
-3. VIELE Berechnungen (10-1000):
-   - Nutze vektorisierte Funktionen: npx_vec(), tpx_matrix()
-   - 10-100x Speedup
-   
-4. VERLAUFSWERTE:
-   - Nutze verlaufswerte_setup() + vektorisierte Barwert-Funktionen
-   - Einmalige Berechnung aller Basis-Vektoren
-   - 50-200x Speedup fuer grosse n
-   
-5. MONTE-CARLO-SIMULATIONEN:
-   - IMMER vektorisierte Funktionen nutzen
-   - Kritisch fuer Performance
-   
-BEISPIEL-BENCHMARKS (n=20):
-
-Standard-Ansatz (Schleife):
-    for i in range(20):
-        bbw = ae_xn_k(alter+i, n-i, ...)
-    Zeit: ~0.5 Sekunden
-
-Vektorisiert (verlaufswerte_setup):
-    setup = verlaufswerte_setup(alter, n, ...)
-    # Nutze setup fuer alle Berechnungen
-    Zeit: ~0.01 Sekunden
-    
-Speedup: 50x
-"""

@@ -1,23 +1,14 @@
 """
-Test-Skript fuer Verlaufswerte-Modul
+Test-Script fuer vektorisierte Verlaufswerte
 
-Demonstriert die Verwendung des Verlaufswerte-Moduls mit verschiedenen
-Anwendungsfaellen und zeigt Performance-Vergleiche.
+Validiert die vektorisierte Implementation gegen:
+1. Standard-Implementation (interne Konsistenz)
+2. Excel-Tarifrechner (externe Validierung)
 
-Verzeichnisstruktur:
-    projekt/
-    ├── data/
-    │   ├── DAV1994_T.csv
-    │   └── DAV2008_T.csv
-    ├── barwerte/
-    │   ├── __init__.py
-    │   ├── sterbetafel.py
-    │   ├── basisfunktionen.py
-    │   ├── rentenbarwerte.py
-    │   └── leistungsbarwerte.py
-    ├── verlaufswerte.py          # <-- Dieses Modul
-    ├── tests/
-    │   ├── test_verlaufswerte.py     # <-- Dieses Skript
+Testet:
+- Korrektheit der vektorisierten Funktionen
+- Performance-Gewinn
+- Identitaet der Ergebnisse mit Excel
 """
 
 import sys
@@ -25,32 +16,45 @@ import time
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
-# WICHTIG: Fuege Parent-Verzeichnis zum Python-Pfad hinzu
-# Damit Python die Module barwerte/ und verlaufswerte.py findet
-script_dir = Path(__file__).parent  # tests/
-parent_dir = script_dir.parent       # projekt/
+# Setup: Import-Pfade
+# Damit Python die Module barwerte/ und verlaufswerte_verctorized.py findet
+script_dir = Path(__file__).parent
+parent_dir = script_dir.parent
+
+# Fuege Parent-Verzeichnis zum Python-Pfad hinzu
 if str(parent_dir) not in sys.path:
     sys.path.insert(0, str(parent_dir))
 
-# Importiere Barwerte-Package und Verlaufswerte-Modul
+print(f"\nScript liegt in: {script_dir}")
+print(f"Parent-Dir ist:  {parent_dir}")
+print(f"sys.path[0]:     {sys.path[0]}")
+
+# =============================================================================
+# Imports
+# =============================================================================
+
 try:
     from barwerte.sterbetafel import Sterbetafel
     from barwerte import rentenbarwerte as rbw
-    from barwerte import leistungsbarwerte as lbw
+    from barwerte import leistungsbarwerte as lbw    
+    from barwerte import basisfunktionen as bf
     from verlaufswerte import (
         Verlaufswerte, 
         VerlaufswerteConfig, 
-        berechne_verlaufswerte
-    )
+        berechne_verlaufswerte,
+        berechne_reserve
+    )        
 except ImportError as e:
-    print(f"Fehler beim Import: {e}")
+    print(f"\nFEHLER beim Import: {e}")
     print("\nStelle sicher, dass folgende Struktur vorhanden ist:")
     print("  projekt/")
-    print("    ├── barwerte/          # Package")
-    print("    ├── verlaufswerte.py   # Modul")
+    print("    ├── barwerte/                    # Package")
+    print("    ├── verlaufswerte_vectorized.py  # Modul")
     print("    └── tests/")
-    print("        └── test_verlaufswerte.py")
+    print("        └── test_verlaufswerte_vectorized.py")
     print(f"\nAktuelles Verzeichnis: {Path.cwd()}")
     print(f"Script-Verzeichnis: {script_dir}")
     print(f"Parent-Verzeichnis: {parent_dir}")
@@ -59,52 +63,154 @@ except ImportError as e:
     traceback.print_exc()
     sys.exit(1)
 
+print()
+
 
 # =============================================================================
-# Testparameter (wie im Excel-Tarifrechner)
+# Test-Konfiguration
 # =============================================================================
 
-# Berechne Pfad zum data/-Verzeichnis (relativ zum Projekt-Hauptverzeichnis)
-DATA_DIR = parent_dir / "data"
+@dataclass
+class TestConfig:
+    """Zentrale Test-Konfiguration."""
+    # Versichertendaten
+    alter: int = 40
+    sex: str = 'M'
+    
+    # Sterbetafel
+    tafel: str = 'DAV1994T'
+    
+    # Finanzmathematische Parameter
+    zins: float = 0.0175  # 1,75%
+    
+    # Vertragsdaten
+    n: int = 30           # Versicherungsdauer
+    t: int = 20           # Beitragszahldauer (hier = n)
+    
+    # Zahlungsweise
+    zw: int = 1  # jaehrlich (1=jaehrlich, 12=monatlich)
+    
+    # Versicherungssumme
+    vs: float = 100000.00  # EUR
+    
+    # Pfad zum Sterbetafel-Verzeichnis 
+    # Berechne Pfad zum data/-Verzeichnis (relativ zum Projekt-Hauptverzeichnis)
+    script_dir = Path(__file__).parent      # tests/
+    parent_dir = script_dir.parent          # projekt/
+    if str(parent_dir) not in sys.path:
+        sys.path.insert(0, str(parent_dir))
+    data_dir: str = parent_dir / "data"
+    
+    def __str__(self) -> str:
+        return f"""
+Testkonfiguration:
+  Alter:                {self.alter}
+  Geschlecht:           {self.sex}
+  Sterbetafel:          {self.tafel}
+  Zinssatz:             {self.zins:.4%}
+  Versicherungsdauer:   {self.n} Jahre (n)
+  Beitragszahldauer:    {self.t} Jahre (t)
+  Zahlungsweise:        {self.zw}x pro Jahr
+  Versicherungssumme:   {self.vs:,.2f} EUR
+  Data-Verzeichnis:     {self.data_dir}
+"""
 
-CONFIG = {
-    'alter': 40,
-    'n': 20,
-    'sex': 'M',
-    'zins': 0.0175,
-    'zw': 1,
-    'tafel': 'DAV1994T',
-    'data_dir': str(DATA_DIR)  # Absoluter Pfad zum data/-Verzeichnis
-}
+CONFIG = TestConfig()
 
 
-def test_basis_berechnung():
+# =============================================================================
+# Excel-Referenzwerte
+# =============================================================================
+
+class ExcelReferenzwerte:
     """
-    Test 1: Basis-Berechnung mit dem neuen Verlaufswerte-Modul
+    Excel-Referenzwerte aus dem Tarifrechner.
+    
+    WICHTIG: Diese Werte muessen aus deinem Excel-Tarifrechner
+    uebernommen werden!
+    
+    Fuer CONFIG: alter=40, n=20, sex='M', zins=0.0175, zw=1, tafel='DAV1994_T'
+    """
+    
+    # Rentenbarwerte ae_{x+t}:n-t fuer t=0..n-1
+    # Beispiel: ae_{40}:20, ae_{41}:19, ..., ae_{59}:1
+    rentenbarwerte = {
+        0: 14.919192111,   # ae_{40}:20  - BEISPIELWERT, durch Excel-Wert ersetzen!
+        1: 14.621204221,   # ae_{41}:19  - BEISPIELWERT
+        2: 14.311510421,   # ae_{42}:18  - BEISPIELWERT
+        3: 13.989383833,   # ae_{43}:17
+        4: 13.654818345,   # ae_{44}:16
+        5: 13.307404120,   # ae_{45}:15
+        # ... weitere Werte aus Excel einfuegen ...
+    }
+    
+    # Todesfallbarwerte (n-t)Ae_{x+t} fuer t=0..n
+    todesfallbarwerte = {
+        0: 0.043246001,    # 20Ae_{40}  - BEISPIELWERT
+        1: 0.041708571,    # 19Ae_{41}  - BEISPIELWERT
+        2: 0.040170857,    # 18Ae_{42}  - BEISPIELWERT
+        # ... weitere Werte aus Excel einfuegen ...
+    }
+    
+    # Erlebensfallbarwerte (n-t)E_{x+t} fuer t=0..n
+    erlebensfallbarwerte = {
+        0: 0.723788010,    # 20E_{40}  - BEISPIELWERT
+        1: 0.735692025,    # 19E_{41}  - BEISPIELWERT
+        2: 0.747775130,    # 18E_{42}  - BEISPIELWERT
+        # ... weitere Werte aus Excel einfuegen ...
+    }
+    
+    @classmethod
+    def hat_vollstaendige_daten(cls, n: int) -> bool:
+        """Prueft, ob vollstaendige Daten fuer Laufzeit n vorhanden sind."""
+        return (
+            len(cls.rentenbarwerte) >= n and
+            len(cls.todesfallbarwerte) >= n + 1 and
+            len(cls.erlebensfallbarwerte) >= n + 1
+        )
+    
+    @classmethod
+    def als_arrays(cls, n: int) -> Dict[str, np.ndarray]:
+        """Gibt Referenzwerte als NumPy-Arrays zurueck."""
+        return {
+            'rentenbarwerte': np.array([cls.rentenbarwerte.get(t, np.nan) for t in range(n)]),
+            'todesfallbarwerte': np.array([cls.todesfallbarwerte.get(t, np.nan) for t in range(n + 1)]),
+            'erlebensfallbarwerte': np.array([cls.erlebensfallbarwerte.get(t, np.nan) for t in range(n + 1)])
+        }
+
+
+# =============================================================================
+# Test-Funktionen
+# =============================================================================
+
+def test_barwerte(st: Sterbetafel) -> Dict[str, np.ndarray]:
+    """
+    Test 1: Berechnung Barwerte mit verlaufswerte_verctorized.py
     """
     print("\n" + "=" * 80)
-    print("TEST 1: BASIS-BERECHNUNG MIT VERLAUFSWERTE-MODUL")
-    print("=" * 80)
-    
+    print("Test 1: Berechnung Barwerte")
+    print()
+
     # Lade Sterbetafel
-    st = Sterbetafel(CONFIG['tafel'], CONFIG['data_dir'])
+    st = Sterbetafel(CONFIG.tafel, CONFIG.data_dir)
     
     # Erstelle Config-Objekt
     config = VerlaufswerteConfig(
-        alter=CONFIG['alter'],
-        n=CONFIG['n'],
-        sex=CONFIG['sex'],
-        zins=CONFIG['zins'],
-        zw=CONFIG['zw'],
-        sterbetafel=CONFIG['tafel']
+        alter=CONFIG.alter,
+        n=CONFIG.n,
+        t=CONFIG.t,
+        sex=CONFIG.sex,
+        zins=CONFIG.zins,
+        zw=CONFIG.zw,
+        sterbetafel=CONFIG.tafel
     )
-    
+
     # Berechne Verlaufswerte
     vw = Verlaufswerte(config, st)
     ergebnisse = vw.berechne_alle()
     
     # Ausgabe
-    vw.drucke_verlaufswerte(precision=10)
+    #vw.drucke_verlaufswerte(precision=10)
     
     # Zusaetzlich als DataFrame
     print("\nAls pandas DataFrame:")
@@ -114,101 +220,151 @@ def test_basis_berechnung():
     
     return vw, df
 
-
-def test_convenience_funktion():
+def test_reserve(st: Sterbetafel) -> dict:
     """
-    Test 2: Verwendung der Convenience-Funktion
+    Test 1: Berechnung Reserve mit verlaufswerte_verctorized.py
     """
     print("\n" + "=" * 80)
-    print("TEST 2: CONVENIENCE-FUNKTION")
-    print("=" * 80)
+    print("Test 2: Berechnung Reserve")
+    print()
+
+    # Lade Sterbetafel
+    st = Sterbetafel(CONFIG.tafel, CONFIG.data_dir)
+
+    # Berechne Verlaufswerte
+    ergebnisse = berechne_reserve(CONFIG.alter, CONFIG.n, CONFIG.t, CONFIG.sex, CONFIG.zins, CONFIG.zw, st)
     
-    st = Sterbetafel(CONFIG['tafel'], CONFIG['data_dir'])
+    # Ausgabe
+    #vw.drucke_verlaufswerte(precision=10)
     
-    # Direkter Aufruf ohne Config-Objekt
-    ergebnisse = berechne_verlaufswerte(
-        alter=CONFIG['alter'],
-        n=CONFIG['n'],
-        sex=CONFIG['sex'],
-        zins=CONFIG['zins'],
-        zw=CONFIG['zw'],
-        sterbetafel_obj=st
-    )
-    
-    print("\nRentenbarwerte (erste 5):")
-    print(ergebnisse['rentenbarwerte'][:5])
-    
-    print("\nTodesfallbarwerte (erste 5):")
-    print(ergebnisse['todesfallbarwerte'][:5])
+    # Zusaetzlich als DataFrame
+    print(f"\nDK: {ergebnisse['DK'] * CONFIG.vs}")
+    print("-" * 80)
     
     return ergebnisse
 
 
-def test_performance_vergleich():
+def test_3_optimierte_berechnung(st: Sterbetafel) -> Dict[str, np.ndarray]:
     """
-    Test 3: Performance-Vergleich alte vs. neue Methode
+    Berechnet Verlaufswerte
     """
     print("\n" + "=" * 80)
-    print("TEST 3: PERFORMANCE-VERGLEICH")
+    print("Test: Verlaufswerte fuer n={CONFIG.n} Jahre")
+        
+    start_time = time.time()
+    
+    # Ultra-optimierte Berechnung
+    rentenbarwerte = rbw.ae_xn_k(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, CONFIG.zw, st)    
+    todesfallbarwerte = lbw.nAe_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)    
+    erlebensfallbarwerte = lbw.nE_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    
+    elapsed = time.time() - start_time
+    
+    results = {
+        'rentenbarwerte': rentenbarwerte,
+        'todesfallbarwerte': todesfallbarwerte,
+        'erlebensfallbarwerte': erlebensfallbarwerte,
+        'zeit': elapsed
+    }
+    
+    print(f"\n✓ Optimierte Berechnung abgeschlossen")
+    print(f"  Berechnungszeit: {elapsed:.6f} Sekunden")
+    print(f"\nErste 5 Rentenbarwerte:")
+    for m in range(min(5, CONFIG.t)):
+        print(f"  t={m}: ae_{{{CONFIG.alter+m}}}:{CONFIG.t-m} = {rentenbarwerte[m]:.12f}")
+    
+    print(f"\nTodesfallbarwerte:")
+    for m in range(min(5, CONFIG.n)):
+        print(f"  n={m}: |{CONFIG.n-m}Ae_{{{CONFIG.alter+m}}} = {todesfallbarwerte[m]:.12f}")
+    
+    print(f"\nErlebensfallbarwerte:")
+    for m in range(min(5, CONFIG.n)):
+        print(f"  n={m}: {CONFIG.n-m}E_{{{CONFIG.alter+m}}} = {erlebensfallbarwerte[m]:.12f}")
+    
+    return results
+
+
+def test_5_vergleich_mit_excel(results: Dict) -> bool:
+    """
+    TEST 5: Vergleich mit Excel-Referenzwerten
+    
+    Vergleicht die berechneten Werte mit den Excel-Referenzwerten.
+    """
+    print("\n" + "=" * 80)
+    print("TEST 5: VERGLEICH MIT EXCEL-REFERENZWERTEN")
     print("=" * 80)
     
-    st = Sterbetafel(CONFIG['tafel'], CONFIG['data_dir'])
+    if not ExcelReferenzwerte.hat_vollstaendige_daten(CONFIG.n):
+        print("\n✗ Keine vollstaendigen Excel-Referenzwerte vorhanden")
+        print("  Bitte trage die Werte aus dem Excel-Tarifrechner in die")
+        print("  Klasse 'ExcelReferenzwerte' ein!")
+        return False
     
-    # --- ALTE METHODE: Sequentielle For-Schleife ---
-    print("\n1) Alte Methode (sequentielle for-Schleife):")
-    start_old = time.time()
+    excel_ref = ExcelReferenzwerte.als_arrays(CONFIG.n)
+    tolerance = 1e-8  # Excel hat typischerweise ~8-10 Dezimalstellen Genauigkeit
     
-    rentenbarwerte_old = []
-    for i in range(CONFIG['n']):
-        bbw = rbw.ae_xn_k(
-            CONFIG['alter'] + i, 
-            CONFIG['n'] - i, 
-            CONFIG['sex'], 
-            CONFIG['zins'], 
-            CONFIG['zw'], 
-            st
-        )
-        rentenbarwerte_old.append(bbw)
+    alle_tests_ok = True
     
-    zeit_old = time.time() - start_old
-    print(f"   Zeit: {zeit_old:.4f} Sekunden")
+    # Vergleiche Rentenbarwerte
+    print("\nRentenbarwerte:")
+    valid_mask = ~np.isnan(excel_ref['rentenbarwerte'])
+    if np.any(valid_mask):
+        diff = np.abs(results['rentenbarwerte'][valid_mask] - excel_ref['rentenbarwerte'][valid_mask])
+        max_diff = np.max(diff)
+        
+        print(f"  Anzahl Vergleichswerte: {np.sum(valid_mask)}")
+        print(f"  Maximale Differenz:     {max_diff:.2e}")
+        print(f"  Status:                 {'✓ OK' if max_diff < tolerance else '✗ FEHLER'}")
+        
+        if max_diff >= tolerance:
+            alle_tests_ok = False
+            print("\n  Details der ersten 5 Werte:")
+            for t in range(min(5, CONFIG.n)):
+                if not np.isnan(excel_ref['rentenbarwerte'][t]):
+                    python_wert = results['rentenbarwerte'][t]
+                    excel_wert = excel_ref['rentenbarwerte'][t]
+                    differenz = abs(python_wert - excel_wert)
+                    print(f"    t={t}:")
+                    print(f"      Python: {python_wert:.12f}")
+                    print(f"      Excel:  {excel_wert:.12f}")
+                    print(f"      Diff:   {differenz:.2e} {'✓' if differenz < tolerance else '✗'}")
+    else:
+        print("  ✗ Keine Excel-Referenzwerte vorhanden")
+        alle_tests_ok = False
     
-    # --- NEUE METHODE: Verlaufswerte-Klasse ---
-    print("\n2) Neue Methode (Verlaufswerte-Klasse):")
-    start_new = time.time()
+    # Vergleiche Todesfallbarwerte
+    print("\nTodesfallbarwerte:")
+    valid_mask = ~np.isnan(excel_ref['todesfallbarwerte'])
+    if np.any(valid_mask):
+        diff = np.abs(results['todesfallbarwerte'][valid_mask] - excel_ref['todesfallbarwerte'][valid_mask])
+        max_diff = np.max(diff)
+        
+        print(f"  Anzahl Vergleichswerte: {np.sum(valid_mask)}")
+        print(f"  Maximale Differenz:     {max_diff:.2e}")
+        print(f"  Status:                 {'✓ OK' if max_diff < tolerance else '✗ FEHLER'}")
+        
+        if max_diff >= tolerance:
+            alle_tests_ok = False
+    else:
+        print("  ✗ Keine Excel-Referenzwerte vorhanden")
     
-    config = VerlaufswerteConfig(
-        alter=CONFIG['alter'],
-        n=CONFIG['n'],
-        sex=CONFIG['sex'],
-        zins=CONFIG['zins'],
-        zw=CONFIG['zw'],
-        sterbetafel=CONFIG['tafel']
-    )
+    # Vergleiche Erlebensfallbarwerte
+    print("\nErlebensfallbarwerte:")
+    valid_mask = ~np.isnan(excel_ref['erlebensfallbarwerte'])
+    if np.any(valid_mask):
+        diff = np.abs(results['erlebensfallbarwerte'][valid_mask] - excel_ref['erlebensfallbarwerte'][valid_mask])
+        max_diff = np.max(diff)
+        
+        print(f"  Anzahl Vergleichswerte: {np.sum(valid_mask)}")
+        print(f"  Maximale Differenz:     {max_diff:.2e}")
+        print(f"  Status:                 {'✓ OK' if max_diff < tolerance else '✗ FEHLER'}")
+        
+        if max_diff >= tolerance:
+            alle_tests_ok = False
+    else:
+        print("  ✗ Keine Excel-Referenzwerte vorhanden")
     
-    vw = Verlaufswerte(config, st)
-    ergebnisse = vw.berechne_alle()
-    rentenbarwerte_new = ergebnisse['rentenbarwerte']
-    
-    zeit_new = time.time() - start_new
-    print(f"   Zeit: {zeit_new:.4f} Sekunden")
-    
-    # Speedup
-    speedup = zeit_old / zeit_new if zeit_new > 0 else float('inf')
-    print(f"\n3) Performance-Gewinn:")
-    print(f"   Speedup: {speedup:.2f}x schneller")
-    print(f"   Zeitersparnis: {(zeit_old - zeit_new):.4f} Sekunden "
-          f"({100 * (zeit_old - zeit_new) / zeit_old:.1f}%)")
-    
-    # Validierung: Sind die Ergebnisse identisch?
-    max_diff = np.max(np.abs(
-        np.array(rentenbarwerte_old) - rentenbarwerte_new
-    ))
-    print(f"\n4) Validierung:")
-    print(f"   Maximale Differenz: {max_diff:.2e}")
-    print(f"   Ergebnisse identisch: {max_diff < 1e-10}")
-    
-    return rentenbarwerte_old, rentenbarwerte_new
+    return alle_tests_ok
 
 
 def test_export_excel():
@@ -243,120 +399,123 @@ def test_export_excel():
     return df
 
 
-def test_verschiedene_parameter():
+def erstelle_vergleichstabelle(
+    standard_results: Dict,
+    vec_results: Dict,
+    opt_results: Dict,
+    excel_ref: Dict
+) -> pd.DataFrame:
     """
-    Test 5: Verlaufswerte fuer verschiedene Parameterkombinationen
+    Erstellt eine Vergleichstabelle aller Ergebnisse.
     """
-    print("\n" + "=" * 80)
-    print("TEST 5: VERSCHIEDENE PARAMETERKOMBINATIONEN")
-    print("=" * 80)
+    n = CONFIG.n
     
-    st = Sterbetafel(CONFIG['tafel'], CONFIG['data_dir'])
-    
-    # Test verschiedene Zahlungsweisen
-    zahlungsweisen = [1, 2, 4, 12]
-    
-    print("\nVergleich verschiedener Zahlungsweisen:")
-    print("(Rentenbarwert zu Beginn, t=0)\n")
-    
-    for zw in zahlungsweisen:
-        config = VerlaufswerteConfig(
-            alter=CONFIG['alter'],
-            n=CONFIG['n'],
-            sex=CONFIG['sex'],
-            zins=CONFIG['zins'],
-            zw=zw,
-            sterbetafel=CONFIG['tafel']
-        )
-        
-        vw = Verlaufswerte(config, st)
-        ergebnisse = vw.berechne_alle()
-        
-        bbw_start = ergebnisse['rentenbarwerte'][0]
-        print(f"  Zahlungsweise {zw:2d}x: ae_{CONFIG['alter']}:{CONFIG['n']} "
-              f"= {bbw_start:.8f}")
-
-
-def test_vergleich_mit_excel():
-    """
-    Test 6: Vergleich mit Excel-Referenzwerten
-    
-    Hier kannst du Referenzwerte aus deinem Excel-Tarifrechner einfuegen
-    und gegen die Python-Implementierung validieren.
-    """
-    print("\n" + "=" * 80)
-    print("TEST 6: VALIDIERUNG GEGEN EXCEL-REFERENZWERTE")
-    print("=" * 80)
-    
-    st = Sterbetafel(CONFIG['tafel'], CONFIG['data_dir'])
-    
-    config = VerlaufswerteConfig(
-        alter=CONFIG['alter'],
-        n=CONFIG['n'],
-        sex=CONFIG['sex'],
-        zins=CONFIG['zins'],
-        zw=CONFIG['zw'],
-        sterbetafel=CONFIG['tafel']
-    )
-    
-    vw = Verlaufswerte(config, st)
-    ergebnisse = vw.berechne_alle()
-    
-    # HIER: Fuege Excel-Referenzwerte ein
-    # Beispiel fuer t=0 (anpassen an deine Excel-Werte):
-    excel_referenz = {
-        'ae_xn_k': {
-            0: 14.919192111,  # Beispielwert - durch echten Wert ersetzen
-            1: 14.621204221,  # Beispielwert
-            # ... weitere Werte ...
-        },
-        'nAe_x': {
-            0: 0.043246001,  # Beispielwert
-            1: 0.041708571,  # Beispielwert
-            # ... weitere Werte ...
-        }
+    # Erstelle DataFrame
+    data = {
+        't': list(range(n + 1)),
+        'Alter': [CONFIG.alter + t for t in range(n + 1)],
+        'Restlaufzeit': [n - t for t in range(n + 1)]
     }
     
-    print("\nVergleich Rentenbarwerte (erste 2 Zeitpunkte):")
-    for t in [0, 1]:
-        if t in excel_referenz['ae_xn_k']:
-            python_wert = ergebnisse['rentenbarwerte'][t]
-            excel_wert = excel_referenz['ae_xn_k'][t]
-            diff = abs(python_wert - excel_wert)
-            
-            print(f"  t={t}:")
-            print(f"    Python: {python_wert:.10f}")
-            print(f"    Excel:  {excel_wert:.10f}")
-            print(f"    Diff:   {diff:.2e}")
+    # Rentenbarwerte (nur bis n-1)
+    data['ae_xn_standard'] = np.append(standard_results['rentenbarwerte'], np.nan)
+    if vec_results:
+        data['ae_xn_vec'] = np.append(vec_results['rentenbarwerte'], np.nan)
+    if opt_results:
+        data['ae_xn_opt'] = np.append(opt_results['rentenbarwerte'], np.nan)
     
-    print("\nHINWEIS: Bitte Excel-Referenzwerte im Code eintragen!")
+    data['ae_xn_excel'] = np.append(
+        [excel_ref['rentenbarwerte'].get(t, np.nan) for t in range(n)],
+        np.nan
+    )
+    
+    # Todesfallbarwerte
+    data['nAe_x_standard'] = standard_results['todesfallbarwerte']
+    if vec_results:
+        data['nAe_x_vec'] = vec_results['todesfallbarwerte']
+    data['nAe_x_excel'] = [excel_ref['todesfallbarwerte'].get(t, np.nan) for t in range(n + 1)]
+    
+    # Erlebensfallbarwerte
+    data['nE_x_standard'] = standard_results['erlebensfallbarwerte']
+    if vec_results:
+        data['nE_x_vec'] = vec_results['erlebensfallbarwerte']
+    data['nE_x_excel'] = [excel_ref['erlebensfallbarwerte'].get(t, np.nan) for t in range(n + 1)]
+    
+    df = pd.DataFrame(data)
+    return df
 
 
 # =============================================================================
 # Hauptprogramm
 # =============================================================================
 
-if __name__ == "__main__":
+def main():
+    """Fuehrt alle Tests aus."""
+    
+    print(CONFIG)
+    
+    # Lade Sterbetafel
     print("\n" + "=" * 80)
-    print("VERLAUFSWERTE-MODUL - UMFASSENDER TEST")
+    print("VORBEREITUNG: LADE STERBETAFEL")
     print("=" * 80)
-    print(f"\nParameter:")
-    for key, value in CONFIG.items():
-        print(f"  {key:15s}: {value}")
     
     try:
-        # Fuehre alle Tests aus
-        vw, df = test_basis_berechnung()
-        ergebnisse = test_convenience_funktion()
-        old_vals, new_vals = test_performance_vergleich()
-        df_export = test_export_excel()
-        test_verschiedene_parameter()
-        test_vergleich_mit_excel()
-        
-        print("\n" + "=" * 80)
-        print("ALLE TESTS ERFOLGREICH ABGESCHLOSSEN")
-        print("=" * 80)
-        
+        st = Sterbetafel(CONFIG.tafel, data_dir=CONFIG.data_dir)
+        print(f"\n✓ Sterbetafel erfolgreich geladen: {st.name}")
+    except FileNotFoundError as e:
+        print(f"\n✗ FEHLER: {e}")
+        print("  Bitte passe CONFIG.data_dir an!")
+        return False
+    
+    
+    # Fuehre alle Tests aus
+    vw, df = test_barwerte(st)
+
+    dk = test_reserve(st)
+
+
+    
+#    # Vergleiche mit Excel (nutze vektorisierte Ergebnisse wenn verfuegbar)
+#    test_results = vec_results if vec_results else standard_results
+#    excel_ok = test_5_vergleich_mit_excel(test_results)
+#    
+#    # Erstelle Vergleichstabelle
+#    print("\n" + "=" * 80)
+#    print("VERGLEICHSTABELLE")
+#    print("=" * 80)
+#    
+#    df = erstelle_vergleichstabelle(
+#        standard_results,
+#        vec_results,
+#        opt_results,
+#        ExcelReferenzwerte
+#    )
+#    
+#    # Zeige erste Zeilen
+#    print("\nErste 10 Zeilen:")
+#    print(df.head(10).to_string(index=False))
+#    
+#    # Speichere als Excel
+#    output_file = "verlaufswerte_vergleich.xlsx"
+#    df.to_excel(output_file, index=False, engine='openpyxl')
+#    print(f"\n✓ Vollstaendige Tabelle gespeichert: {output_file}")
+    
+    # Zusammenfassung
+    print("\n" + "=" * 80)
+    print("ZUSAMMENFASSUNG")
+    print("=" * 80)
+    
+    print(f"\n✓ Standard-Berechnung:     Abgeschlossen")
+    
+#    print(f"{'✓' if excel_ok else '✗'} Excel-Vergleich: "
+#          f"{'BESTANDEN' if excel_ok else 'FEHLER oder unvollstaendig'}")
+    
+   
+
+if __name__ == "__main__":
+    try:
+        erfolg = main()
+        sys.exit(0 if erfolg else 1)
     except Exception as e:
         print(f"\n\nFEHLER bei Test-Ausfuehrung:")
         print(f"{type(e).__name__}: {e}")

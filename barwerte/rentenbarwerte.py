@@ -15,177 +15,12 @@ from typing import Union, Optional
 
 from .sterbetafel import Sterbetafel, MAX_ALTER
 from .basisfunktionen import (
-    diskont, abzugsglied, npx, nqx, npx_skalar, 
-    tpx_matrix, diskont_potenz_vec, verlaufswerte_setup
+    diskont, abzugsglied, npx, nqx, npx_val, 
+    tpx_matrix, verlaufswerte_setup
 )
 
-# Skalare Funktionen 
-def ae_x_skalar(alter: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
-    
-    if alter <= 0 or alter >= MAX_ALTER:
-        return 0.0
-    
-    n = MAX_ALTER - alter
-    v = diskont(zins)    
-    barwert = 0.0
-    tpx = 1.0  # 0px = 1
-    
-    for t in range(n):
-        barwert += tpx * (v ** t)
-        
-        if t < n - 1:
-            tpx *= (1.0 - sterbetafel_obj.qx(alter + t, sex))
-    
-    return barwert
 
-def ae_x_k_skalar(alter: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> float:
-    """
-    Berechnet den Barwert einer lebenslangen vorschuessigen Leibrente mit k Zahlungen pro Jahr
-    
-    Formel: ax^(k) = ax - abzug(k,i)
-    
-    wobei abzug das Abzugsglied nach Woolhouse ist.
-    
-    Args:
-        alter: Alter der versicherten Person
-        sex: Geschlecht ('M' oder 'F')
-        zins: Jaehrlicher Zinssatz
-        zw: Zahlungsweise (1, 2, 4, oder 12)
-        sterbetafel_obj: Sterbetafel-Objekt
-    
-    Returns:
-        Barwert einer lebenslangen vorschuessigen Leibrente mit k Zahlungen pro Jahr
-    """
-    if zw <= 0:
-        return 0.0
-    
-    ax_wert = ae_x_skalar(alter, sex, zins, sterbetafel_obj)
-    abzug = abzugsglied(zw, zins)
-    
-    return ax_wert - abzug
-
-def ae_xn_skalar(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
-    if n <= 0 or alter + n > MAX_ALTER:
-        return 0.0
-    
-    n = min(MAX_ALTER - alter, n)
-    v = diskont(zins)    
-    barwert = 0.0
-    tpx = 1.0  # 0px = 1
-    
-    for t in range(n):
-        barwert += tpx * (v ** t)
-        
-        if t < n - 1:
-            tpx *= (1.0 - sterbetafel_obj.qx(alter + t, sex))
-    
-    return barwert
-
-def ae_xn_k_skalar(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> float:
-    if zw <= 0 or n <= 0 or alter + n > MAX_ALTER:
-        return 0.0
-    
-    n = min(MAX_ALTER - alter, n)
-    v = diskont(zins)    
-    axn_wert = ae_xn_skalar(alter, n, sex, zins, sterbetafel_obj)
-    abzug = abzugsglied(zw, zins)
-    n_px = npx_skalar(alter, n, sex, sterbetafel_obj)
-    
-    return axn_wert - abzug * (1.0 - n_px * (v ** n))
-
-# Vektorisierte Funktionen
-
-# langsamer
-def ae_xn_vec(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> np.ndarray:
-    """
-    VEKTORISIERT: Berechnet ALLE Rentenbarwerte ae_{x+t}:n-t fuer t=0..n-1.
-    
-    Dies ist die zentrale Funktion fuer Verlaufswerte-Berechnungen.
-    Sie berechnet alle Rentenbarwerte in einem Durchgang mit maximaler
-    Effizienz.
-    
-    Args:
-        alter: Eintrittsalter
-        n: Versicherungsdauer
-        sex: Geschlecht
-        zins: Zinssatz
-        zw: Zahlungsweise
-        sterbetafel_obj: Sterbetafel-Objekt
-    
-    Returns:
-        NumPy-Array der Laenge n mit Rentenbarwerten:
-        - Index 0: ae_x:n (Beginn Jahr 1)
-        - Index 1: ae_{x+1}:n-1 (Beginn Jahr 2)
-        - ...
-        - Index n-1: ae_{x+n-1}:1 (Beginn Jahr n)
-    
-    Performance:
-        - Standard-Ansatz (Schleife mit ae_xn_k): ~0.5s fuer n=20
-        - Diese Funktion: ~0.005s fuer n=20
-        - Speedup: ~100x
-    
-    Algorithmus:
-        1. Einmalige Berechnung aller tpx und v^t Werte
-        2. Nutze kumulative Reverse-Summen fuer effiziente Berechnung
-        3. Korrigiere fuer unterjahrige Zahlungen
-    """
-    if n <= 0 or alter + n > MAX_ALTER:
-        return np.array([])
-    
-    # Begrenze auf MAX_ALTER
-    n = min(MAX_ALTER - alter, n)
-    
-    # === SCHRITT 1: Basis-Vektoren berechnen ===
-    
-    # Alle tpx-Werte fuer x, x+1, ..., x+n
-    # Wir brauchen tpx fuer jedes Startalter x+t und Restlaufzeit n-t
-    
-    # Zeit-Array
-    t_array = np.arange(n)
-    
-    # Initialisiere Ergebnis-Array
-    rentenbarwerte = np.zeros(n, dtype=float)
-    
-    # Diskontierungsfaktor
-    v = diskont(zins)
-    
-    # === SCHRITT 2: Berechne Rentenbarwerte ===
-    
-    # Fuer jedes Startalter x+t berechne ae_{x+t}:n-t
-    for t in range(n):
-        alter_t = alter + t
-        restlaufzeit = n - t
-        
-        # Hole tpx-Werte fuer dieses Startalter
-        tpx_t = tpx_matrix(alter_t, restlaufzeit, sex, sterbetafel_obj)
-        
-        # Berechne v^0, v^1, ..., v^(n-t-1)
-        s_array = np.arange(restlaufzeit)
-        v_s = v ** s_array
-        
-        # Rentenbarwert: sum_{s=0}^{restlaufzeit-1} [tpx_t[s] * v^s]
-        rentenbarwerte[t] = np.sum(tpx_t[:restlaufzeit] * v_s)
-    
-    # === SCHRITT 3: Korrektur fuer unterjahrige Zahlungen ===
-    
-    if zw > 1:
-        abzug = abzugsglied(zw, zins)
-        
-        # Fuer jedes t berechne Korrekturterm: abzug * [1 - (n-t)px * v^(n-t)]
-        for t in range(n):
-            alter_t = alter + t
-            restlaufzeit = n - t
-            
-            # (n-t)px
-            n_t_px = npx_skalar(alter_t, restlaufzeit, sex, sterbetafel_obj)
-            
-            # Abzugsglied-Korrektur
-            korrektur = abzug * (1.0 - n_t_px * (v ** restlaufzeit))
-            rentenbarwerte[t] -= korrektur
-    
-    return rentenbarwerte
-
-# optimiert Berechnungsvariante
+# Vektorisierte Funktionen - optimiert Berechnungsvariante
 def ae_x(alter: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     Berechnet den lebenslangen vorschuessigen Rentenbarwert ae_x.
@@ -435,3 +270,154 @@ def m_ae_xn_k(alter: int, n: int, t: int, sex: str, zins: float, zw: int, sterbe
 
 
 
+# =======================================================================================================================
+# Backup Funktionen
+# =======================================================================================================================
+
+# Skalare Funktionen 
+def ae_x_k_val(alter: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> float:
+    """
+    Berechnet den Barwert einer lebenslangen vorschuessigen Leibrente mit k Zahlungen pro Jahr
+    
+    Formel: ax^(k) = ax - abzug(k,i)
+    
+    wobei abzug das Abzugsglied nach Woolhouse ist.
+    
+    Args:
+        alter: Alter der versicherten Person
+        sex: Geschlecht ('M' oder 'F')
+        zins: Jaehrlicher Zinssatz
+        zw: Zahlungsweise (1, 2, 4, oder 12)
+        sterbetafel_obj: Sterbetafel-Objekt
+    
+    Returns:
+        Barwert einer lebenslangen vorschuessigen Leibrente mit k Zahlungen pro Jahr
+    """
+
+    if alter <= 0 or alter >= MAX_ALTER:
+        return 0.0
+    
+    n = MAX_ALTER - alter
+    v = diskont(zins)  
+
+    # Alle qx-Werte auf einmal holen
+    qx_vec = sterbetafel_obj.qx_vec(alter, n, sex)
+
+    barwert = 0.0
+    tpx = 1.0  # 0px = 1
+    
+    for t in range(n):
+        barwert += tpx * (v ** t)
+        
+        if t < n - 1:
+            tpx *= (1.0 - qx_vec[t])
+    
+    abzug = abzugsglied(zw, zins)
+
+    return barwert - abzug
+
+def ae_xn_k_val(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> float:
+    if zw <= 0 or n <= 0 or alter + n > MAX_ALTER:
+        return 0.0
+    
+    n = min(MAX_ALTER - alter, n)
+    v = diskont(zins)    
+
+    # Alle qx-Werte auf einmal holen
+    qx_vec = sterbetafel_obj.qx_vec(alter, n, sex)
+
+    barwert = 0.0
+    tpx = 1.0  # 0px = 1
+    
+    for t in range(n):
+        barwert += tpx * (v ** t)
+        
+        if t < n - 1:
+            tpx *= (1.0 - qx_vec[t])
+    
+    abzug = abzugsglied(zw, zins)
+    n_px = npx_val(alter, n, sex, sterbetafel_obj)
+    
+    return barwert - abzug * (1.0 - n_px * (v ** n))
+
+
+# Vektorisierte Funktionen - nicht optimierte Umsetzung
+def ae_xn_vec(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+    """
+    VEKTORISIERT: Berechnet ALLE Rentenbarwerte ae_{x+t}:n-t fuer t=0..n-1.
+    
+    Dies ist die zentrale Funktion fuer Verlaufswerte-Berechnungen.
+    Sie berechnet alle Rentenbarwerte in einem Durchgang mit maximaler
+    Effizienz.
+    
+    Args:
+        alter: Eintrittsalter
+        n: Versicherungsdauer
+        sex: Geschlecht
+        zins: Zinssatz
+        zw: Zahlungsweise
+        sterbetafel_obj: Sterbetafel-Objekt
+    
+    Returns:
+        NumPy-Array der Laenge n mit Rentenbarwerten:
+        - Index 0: ae_x:n (Beginn Jahr 1)
+        - Index 1: ae_{x+1}:n-1 (Beginn Jahr 2)
+        - ...
+        - Index n-1: ae_{x+n-1}:1 (Beginn Jahr n)
+    
+    Performance:
+        - Standard-Ansatz (Schleife mit ae_xn_k): ~0.5s fuer n=20
+        - Diese Funktion: ~0.005s fuer n=20
+        - Speedup: ~100x
+    
+    Algorithmus:
+        1. Einmalige Berechnung aller tpx und v^t Werte
+        2. Nutze kumulative Reverse-Summen fuer effiziente Berechnung
+        3. Korrigiere fuer unterjahrige Zahlungen
+    """
+    if n <= 0 or alter + n > MAX_ALTER:
+        return np.array([])
+    
+    # Begrenze auf MAX_ALTER
+    n = min(MAX_ALTER - alter, n)
+    
+    # Alle tpx-Werte fuer x, x+1, ..., x+n
+    # Wir brauchen tpx fuer jedes Startalter x+t und Restlaufzeit n-t
+    
+    # Initialisiere Ergebnis-Array
+    rentenbarwerte = np.zeros(n, dtype=float)
+    
+    # Diskontierungsfaktor
+    v = diskont(zins)
+    
+    # Fuer jedes Startalter x+t berechne ae_{x+t}:n-t
+    for t in range(n):
+        alter_t = alter + t
+        restlaufzeit = n - t
+        
+        # Hole tpx-Werte fuer dieses Startalter
+        tpx_t = tpx_matrix(alter_t, restlaufzeit, sex, sterbetafel_obj)
+        
+        # Berechne v^0, v^1, ..., v^(n-t-1)
+        s_array = np.arange(restlaufzeit)
+        v_s = v ** s_array
+        
+        # Rentenbarwert: sum_{s=0}^{restlaufzeit-1} [tpx_t[s] * v^s]
+        rentenbarwerte[t] = np.sum(tpx_t[:restlaufzeit] * v_s)
+    
+    if zw > 1:
+        abzug = abzugsglied(zw, zins)
+        
+        # Fuer jedes t berechne Korrekturterm: abzug * [1 - (n-t)px * v^(n-t)]
+        for t in range(n):
+            alter_t = alter + t
+            restlaufzeit = n - t
+            
+            # (n-t)px
+            n_t_px = npx_val(alter_t, restlaufzeit, sex, sterbetafel_obj)
+            
+            # Abzugsglied-Korrektur
+            korrektur = abzug * (1.0 - n_t_px * (v ** restlaufzeit))
+            rentenbarwerte[t] -= korrektur
+    
+    return rentenbarwerte
