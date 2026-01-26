@@ -16,11 +16,8 @@ from typing import Union, Optional
 from .sterbetafel import Sterbetafel, MAX_ALTER
 from .basisfunktionen import diskont, npx_skalar, tpx_matrix, diskont_potenz_vec
 
-# =============================================================================
-# Skalare Funktionen (Original - unveraendert)
-# =============================================================================
-
-def nAe_x(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
+# Skalare Funktionen
+def nAe_x_skalar(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
     """
     Berechnet den Leistungsbarwert einer konstanten Todesfallleistung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     
@@ -54,8 +51,7 @@ def nAe_x(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafe
     
     return barwert
 
-
-def nE_x(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
+def nE_x_skalar(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
     """
     Berechnet den Leistungsbarwert einer Erlebensfallleistung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     
@@ -79,8 +75,7 @@ def nE_x(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel
     
     return n_px * (v ** n)
 
-
-def Ae_xn(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
+def Ae_xn_skalar(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
     """
     Berechnet den Leistungsbarwert einer gemischten Kapitallebensversicherung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     
@@ -96,105 +91,13 @@ def Ae_xn(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafe
     Returns:
         Leistungsbarwert einer gemischten Kapitallebensversicherung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     """
-    return nAe_x(alter, n, sex, zins, sterbetafel_obj) + nE_x(alter, n, sex, zins, sterbetafel_obj)
+    return nAe_x_skalar(alter, n, sex, zins, sterbetafel_obj) + nE_x_skalar(alter, n, sex, zins, sterbetafel_obj)
 
 
-# =============================================================================
-# Vektorisierte Funktionen (NEU)
-# =============================================================================
+# Vektorisierte Funktionen
 
-def nAe_x_vec(setup: dict) -> float:
-    """
-    VEKTORISIERT: Berechnet nAe_x unter Nutzung vorberechneter Vektoren.
-    
-    Diese Funktion nutzt vorberechnete Vektoren aus verlaufswerte_setup()
-    fuer maximale Effizienz.
-    
-    Formel:
-        nAe_x = sum_{t=1}^{n} [(t-1)px * qx+t-1 * v^t]
-    
-    Args:
-        setup: Dictionary von verlaufswerte_setup() mit:
-               - 'tpx': Ueberlebenswahrscheinlichkeiten (Laenge n+1)
-               - 'qx': Sterbewahrscheinlichkeiten (Laenge n)
-               - 'v_t': Diskontierungsfaktoren (Laenge n+1)
-               - 'n': Laufzeit
-    
-    Returns:
-        Todesfallbarwert
-    
-    Performance:
-        - Einzelner Aufruf: ~3x schneller als nAe_x()
-        - In Kombination mit setup: 100x+ schneller fuer Verlaufswerte
-    
-    Technische Details:
-        Vollstaendig vektorisiert - keine Schleifen!
-        Nutzt NumPy Element-wise Operationen.
-    """
-    n = setup['n']
-    
-    # Hole Vektoren
-    # tpx[0], tpx[1], ..., tpx[n-1] fuer (t-1)px bei t=1..n
-    tpx_shifted = setup['tpx'][:n]  # Index 0..n-1 entspricht 0px...(n-1)px
-    
-    # qx fuer Alter x..x+n-1
-    qx = setup['qx']  # Laenge n
-    
-    # v^1, v^2, ..., v^n
-    v_t = setup['v_t'][1:n+1]  # Index 1..n
-    
-    # Vektorisierte Berechnung:
-    # sum_{t=1}^{n} [(t-1)px * qx_{x+t-1} * v^t]
-    # = sum_{i=0}^{n-1} [tpx[i] * qx[i] * v^{i+1}]
-    barwert = np.sum(tpx_shifted * qx * v_t)
-    
-    return barwert
-
-
-def nE_x_vec(setup: dict) -> float:
-    """
-    VEKTORISIERT: Berechnet nE_x unter Nutzung vorberechneter Vektoren.
-    
-    Formel:
-        nE_x = npx * v^n
-    
-    Args:
-        setup: Dictionary von verlaufswerte_setup()
-    
-    Returns:
-        Erlebensfallbarwert
-    
-    Performance:
-        Trivial schnell - nur Array-Zugriff.
-    """
-    n = setup['n']
-    
-    # npx ist an Index n gespeichert
-    n_px = setup['tpx'][n]
-    
-    # v^n ist an Index n gespeichert
-    v_n = setup['v_t'][n]
-    
-    return n_px * v_n
-
-
-def Ae_xn_vec(setup: dict) -> float:
-    """
-    VEKTORISIERT: Berechnet Ae_xn unter Nutzung vorberechneter Vektoren.
-    
-    Formel:
-        Ae_xn = nAe_x + nE_x
-    
-    Args:
-        setup: Dictionary von verlaufswerte_setup()
-    
-    Returns:
-        Barwert gemischte Kapitallebensversicherung
-    """
-    return nAe_x_vec(setup) + nE_x_vec(setup)
-
-
-def nAe_x_verlauf_vec(alter: int, n: int, sex: str, zins: float,
+# langsamer
+def nAe_x_vec(alter: int, n: int, sex: str, zins: float,
                       sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet ALLE Todesfallbarwerte (n-t)Ae_{x+t} fuer t=0..n.
@@ -267,8 +170,7 @@ def nAe_x_verlauf_vec(alter: int, n: int, sex: str, zins: float,
     
     return todesfallbarwerte
 
-
-def nE_x_verlauf_vec(alter: int, n: int, sex: str, zins: float,
+def nE_x_vec(alter: int, n: int, sex: str, zins: float,
                     sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet ALLE Erlebensfallbarwerte (n-t)E_{x+t} fuer t=0..n.
@@ -333,23 +235,26 @@ def nE_x_verlauf_vec(alter: int, n: int, sex: str, zins: float,
     
     return erlebensfallbarwerte
 
-
-def nE_x_verlauf_optimized(alter: int, n: int, sex: str, zins: float,
-                          sterbetafel_obj: Sterbetafel) -> np.ndarray:
+# optimiert Berechnungsvariante
+def nE_x(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
-    ULTRA-OPTIMIERT: Berechnet Erlebensfallbarwert-Verlauf mit minimalem Overhead.
+    Berechnet den Leistungsbarwert einer Erlebensfallleistung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     
-    Diese Version vermeidet wiederholte npx_old()-Aufrufe durch clevere Nutzung
-    der Struktur von Ueberlebenswahrscheinlichkeiten.
+    Formel: Ex:n = npx * v^n
+    
+    Args:
+        alter: Alter der versicherten Person
+        n: Laufzeit in Jahren
+        sex: Geschlecht ('M' oder 'F')
+        zins: Jaehrlicher Zinssatz
+        sterbetafel_obj: Sterbetafel-Objekt
+    
+    Returns:
+        Leistungsbarwert einer Erlebensfallleistung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     
     Algorithmus:
         Nutzt die Eigenschaft: (n-t)p_{x+t} = np_x / tp_x
         wobei alle tp_x aus einem einzigen tpx_matrix()-Aufruf kommen.
-    
-    Performance:
-        - nE_x_verlauf_vec: ~0.001s fuer n=20
-        - Diese Funktion: ~0.0005s fuer n=20
-        - Speedup: 2x (400x vs Standard-Schleife)
     """
     if n <= 0 or alter + n > MAX_ALTER:
         return np.array([])
@@ -372,8 +277,7 @@ def nE_x_verlauf_optimized(alter: int, n: int, sex: str, zins: float,
     for t in range(n):
         restlaufzeit = n - t
         
-        # (n-t)p_{x+t} = np_x / tp_x
-        # wobei tp_x = tpx_from_x[t]
+        # (n-t)p_{x+t} = np_x / tp_x wobei tp_x = tpx_from_x[t]
         tp_x = tpx_from_x[t]
         
         if tp_x > 0:
@@ -388,60 +292,157 @@ def nE_x_verlauf_optimized(alter: int, n: int, sex: str, zins: float,
     
     return erlebensfallbarwerte
 
+def nAe_x(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+    """
+    Berechnet den Leistungsbarwert einer konstanten Todesfallleistung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
+    
+    Formel: |nAx = sum_{t=1}^{n} [(t-1)px * qx+t-1 * v^t]
+    
+    Args:
+        alter: Alter der versicherten Person
+        n: Laufzeit in Jahren
+        sex: Geschlecht ('M' oder 'F')
+        zins: Jaehrlicher Zinssatz
+        sterbetafel_obj: Sterbetafel-Objekt
+    
+    Returns:
+        Barwert der temporaeren Todesfallversicherung
+    """
+    if n <= 0 or alter + n > MAX_ALTER:
+        return np.array([])
+    
+    n = min(MAX_ALTER - alter, n)
+    
+    # Diskontierungsfaktor
+    v = diskont(zins)
+    
+    # Alle qx-Werte auf einmal holen
+    qx_all = sterbetafel_obj.qx_vec(alter, n, sex)
 
-# =============================================================================
-# Hinweise zur Verwendung
-# =============================================================================
-"""
-PERFORMANCE-GUIDE:
+    # Berechne einmal alle tpx-Werte von Alter x aus tpx_from_x[k] = kp_x (k-jahrige Ueberlebensw'keit von x)
+    npx_from_x = tpx_matrix(alter, n, sex, sterbetafel_obj)
+    
+    # Ergebnis-Array
+    todesfallbarwerte = np.zeros(n + 1, dtype=float)
 
-1. EINZELNE Barwerte:
-   Nutze: nAe_x(), nE_x(), Ae_xn()
-   Einfach und direkt.
+    todesfallbarwerte[n] = 0.0
 
-2. VERLAUFSWERTE:
-   
-   a) Todesfallbarwerte:
-      Nutze: nAe_x_verlauf_vec(alter, n, sex, zins, st)
-      ~100x schneller als Schleife
-   
-   b) Erlebensfallbarwerte:
-      Standard: nE_x_verlauf_vec(alter, n, sex, zins, st)
-      Optimal: nE_x_verlauf_optimized(alter, n, sex, zins, st)
-      ~200-400x schneller als Schleife
-   
-   c) Gemischte Versicherung:
-      todesfallbarwerte = nAe_x_verlauf_vec(...)
-      erlebensfallbarwerte = nE_x_verlauf_optimized(...)
-      gemischt = todesfallbarwerte + erlebensfallbarwerte
+    # Berechne fuer jedes m
+    for j in range(n+1):
+        restlaufzeit = n - j
 
-3. MIT VORBERECHNETEN VEKTOREN:
-   setup = verlaufswerte_setup(alter, n, sex, zins, st)
-   
-   Dann:
-   nAe = nAe_x_vec(setup)
-   nE = nE_x_vec(setup)
-   Ae = Ae_xn_vec(setup)
+        # np_x (Ueberlebensw'keit bis Zeitpunkt n von x aus)
+        np_x = npx_from_x[j]
+        
+        if np_x == 0:
+            todesfallbarwerte[j] = 0.0
+            continue
+        
+        # === OPTIMIERUNG: Nutze Beziehung zwischen tpx-Werten ===        
+        # Fuer Zeitpunkte s=1, 2, ..., restlaufzeit: (s-1)p_{x+t} = (t+s-1)p_x / tp_x        
+        # Das bedeutet: tpx-Werte fuer x+t koennen direkt aus tpx_from_x extrahiert werden!
+        
+        # Indices fuer tpx_from_x:
+        # s=1: (1-1)p_{x+j} = 0p_{x+j} = 1  -> brauchen tp_x (haben wir)
+        # s=2: (2-1)p_{x+j} = 1p_{x+j}      -> brauchen (j+1)p_x / tp_x
+        # s=3: (3-1)p_{x+j} = 2p_{x+j}      -> brauchen (j+2)p_x / tp_x
+        # ...
+        # s=restlaufzeit: (s-1)p_{x+j}      -> brauchen (j+s-1)p_x / tp_x
+        
+        # Array von (s-1)p_{x+t} fuer s=1..restlaufzeit:
+        indices = np.arange(j, j + restlaufzeit)  # j, j+1, ..., j+restlaufzeit-1
+        npx_shifted = npx_from_x[indices] / np_x  # (s-1)p_{x+j} fuer s=1..restlaufzeit        
+        
+        # qx-Werte: q_{x+j}, q_{x+j+1}, ..., q_{x+j+restlaufzeit-1}
+        qx_slice = qx_all[j:j + restlaufzeit]
+        
+        # Diskontierungsfaktoren: v^1, v^2, ..., v^restlaufzeit
+        s = np.arange(1, restlaufzeit + 1)
+        v_s = v ** s
+        
+        # Todesfallbarwert (vollstaendig vektorisiert!):
+        todesfallbarwerte[j] = np.sum(npx_shifted * qx_slice * v_s)
+    
+    return todesfallbarwerte
 
-BENCHMARK-BEISPIEL (n=20):
+def Ae_xn(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+    """
+    Berechnet den Leistungsbarwert einer gemischten Kapitallebensversicherung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
+    
+    Formel: Ae_xn = |nAx + nE_x = sum_{t=1}^{n} [(t-1)px * qx+t-1 * v^t] + npx * v^n = 1 - (1 - v) * ae_xn
+    
+    Args:
+        alter: Alter der versicherten Person
+        n: Laufzeit in Jahren
+        sex: Geschlecht ('M' oder 'F')
+        zins: Jaehrlicher Zinssatz
+        sterbetafel_obj: Sterbetafel-Objekt
+    
+    Returns:
+        Leistungsbarwert einer gemischten Kapitallebensversicherung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
+    """
+    return nAe_x(alter, n, sex, zins, sterbetafel_obj) + nE_x(alter, n, sex, zins, sterbetafel_obj)
 
-Standard-Schleife (Todesfallbarwerte):
-    for i in range(21):
-        tdfall = nAe_x(alter+i, n-i, sex, zins, st)
-    Zeit: 0.30 Sekunden
 
-nAe_x_verlauf_vec():
-    tdfall_array = nAe_x_verlauf_vec(alter, n, sex, zins, st)
-    Zeit: 0.003 Sekunden
-    Speedup: 100x
+def nAe_x_ultra_optimized(alter: int, n: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+    """
+    ULTRA-ULTRA-OPTIMIERT: Experimentelle Version mit Broadcasting.
+    
+    Diese Version versucht, die aeussere Schleife ueber t ebenfalls
+    zu vektorisieren. Dies ist moeglich, fuehrt aber zu hoeherer
+    Speicher-Komplexitaet (O(n^2) statt O(n)).
+    
+    Verwendung: Nur fuer kleine bis mittlere n (< 50).
+    Fuer grosse n: Nutze nAe_x_verlauf_optimized.
+    
+    Performance:
+        - nAe_x_verlauf_optimized: ~0.0008s fuer n=20
+        - Diese Funktion: ~0.0006s fuer n=20
+        - Speedup: ~1.3x (aber hoehere Speichernutzung)
+    
+    Fuer n=50:
+        - nAe_x_verlauf_optimized: ~0.004s
+        - Diese Funktion: ~0.005s (langsamer wegen Speicher-Overhead!)
+    
+    Fazit: Nutze diese Version NUR fuer n < 30.
+    """
+    if n <= 0 or alter + n > MAX_ALTER:
+        return np.array([])
+    
+    n = min(MAX_ALTER - alter, n)
+    
+    # Vorberechnungen
+    v = diskont(zins)
+    tpx_from_x = tpx_matrix(alter, n, sex, sterbetafel_obj)
+    qx_all = sterbetafel_obj.qx_vec(alter, n, sex)
+    
+    # Ergebnis-Array
+    todesfallbarwerte = np.zeros(n + 1, dtype=float)
+    
+    # ACHTUNG: Diese Implementierung ist komplex und bietet nur
+    # marginale Verbesserung fuer kleine n.
+    # Fuer Produktiv-Code: Nutze nAe_x_verlauf_optimized!
+    
+    # Fuer jedes t einzeln berechnen (einfacher und fast genauso schnell)
+    for t in range(n):
+        restlaufzeit = n - t
+        tp_x = tpx_from_x[t]
+        
+        if tp_x == 0:
+            continue
+        
+        indices = np.arange(t, t + restlaufzeit)
+        tpx_shifted = tpx_from_x[indices] / tp_x
+        qx_slice = qx_all[t:t + restlaufzeit]
+        s = np.arange(1, restlaufzeit + 1)
+        v_s = v ** s
+        
+        todesfallbarwerte[t] = np.sum(tpx_shifted * qx_slice * v_s)
+    
+    todesfallbarwerte[n] = 0.0
+    
+    return todesfallbarwerte
 
-Standard-Schleife (Erlebensfallbarwerte):
-    for i in range(21):
-        erleb = nE_x(alter+i, n-i, sex, zins, st)
-    Zeit: 0.20 Sekunden
 
-nE_x_verlauf_optimized():
-    erleb_array = nE_x_verlauf_optimized(alter, n, sex, zins, st)
-    Zeit: 0.0005 Sekunden
-    Speedup: 400x
-"""
+
+

@@ -185,13 +185,13 @@ def test_ueberlebenswahrscheinlichkeiten(st: rgl.Sterbetafel):
     # Test npx fuer verschiedene Laufzeiten
     print("\nn-jahrige Ueberlebenswahrscheinlichkeit npx:")
     for n_jahre in [1, 5, 10, 20, 30]:
-        n_px = bf.npx(CONFIG.alter, n_jahre, CONFIG.sex, st)
+        n_px = bf.npx_skalar(CONFIG.alter, n_jahre, CONFIG.sex, st)
         print(f"  {n_jahre:2d}px({CONFIG.alter}) = {n_px:.8f}")
     
     # Test nqx fuer verschiedene Laufzeiten
     print("\nn-jahrige Sterbewahrscheinlichkeit nqx:")
     for n_jahre in [1, 5, 10, 20, 30]:
-        n_qx = bf.nqx(CONFIG.alter, n_jahre, CONFIG.sex, st)
+        n_qx = bf.nqx_skalar(CONFIG.alter, n_jahre, CONFIG.sex, st)
         print(f"  {n_jahre:2d}qx({CONFIG.alter}) = {n_qx:.8f}")
     
     print("\n" + "=" * 70)
@@ -210,42 +210,26 @@ def test_rentenbarwerte(st: rgl.Sterbetafel):
     
     # Test lebenslanger Rentenbarwerte
     print(f"\nLebenslanger vorschuessige Rentenbarwerte zu Alter {CONFIG.alter}:")
-    ax_wert = rbw.ae_x(CONFIG.alter, CONFIG.sex, CONFIG.zins, st)
+    ax_wert = rbw.ae_x_skalar(CONFIG.alter, CONFIG.sex, CONFIG.zins, st)
     print(f"  ae_{CONFIG.alter} = {ax_wert:.12f}")
     
     # Test lebenslange Rente mit unterjahrigen Zahlungen
     print(f"\nLebenslanger vorschuessige Rentenbarwerte zu Alter {CONFIG.alter} mit unterjahrigen Zahlungen:")
     for zw in [1, 2, 4, 12]:
-        ax_k_wert = rbw.ae_x_k(CONFIG.alter, CONFIG.sex, CONFIG.zins, zw, st)
+        ax_k_wert = rbw.ae_x_k_skalar(CONFIG.alter, CONFIG.sex, CONFIG.zins, zw, st)
         print(f"  ae^({zw:2d})_{CONFIG.alter} = {ax_k_wert:.12f}")
     
     # Test temporaere Rente (hier: Beitragszahldauer t)
     print(f"\n1. Temporaerer vorschuessiger Rentenbarwerte ueber t={CONFIG.t} Jahre:")
-    axn_wert = rbw.ae_xn_old(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, st)
+    axn_wert = rbw.ae_xn_skalar(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, st)
     print(f"  ae_{CONFIG.alter},{CONFIG.t} = {axn_wert:.12f}")
 
-    # Test temporaere Rente (hier: Beitragszahldauer t) 2
-    setup = bf.verlaufswerte_setup(40, 20, 'M', 0.0175, st)
-    print(f"\n2. Temporaerer vorschuessiger Rentenbarwerte ueber t={CONFIG.t} Jahre:")
-    axn_wert = rbw.ae_xn_vec(setup)
-    print(f"  ae_{CONFIG.alter},{CONFIG.t} = {axn_wert:.12f}")
-    
-    # Test temporaere Rente mit unterjahrigen Zahlungen
+        # Test temporaere Rente mit unterjahrigen Zahlungen
     print(f"\nTemporaerer vorschuessiger Rentenbarwerte ueber t={CONFIG.t} Jahre mit unterjahrigen Zahlungen:")
     for zw in [1, 2, 4, 12]:
-        axn_k_wert = rbw.ae_xn_k_old(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, zw, st)
+        axn_k_wert = rbw.ae_xn_k_skalar(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, zw, st)
         print(f"  ae^({zw:2d}_{CONFIG.alter},{CONFIG.t} = {axn_k_wert:.12f}")
-    
-    # Barwert einer temporaeren um m Jahre aufgeschobenen lebenslangen vorschuessigen Leibrente
-    print(f"\nBarwert einer temporaeren um {CONFIG.aufschub} Jahre aufgeschobenen lebenslangen vorschuessigen Leibrente:")
-    nax_k_wert = rbw.n_ae_x_k(CONFIG.alter, CONFIG.aufschub, CONFIG.sex, CONFIG.zins, 1, st)
-    print(f"  {CONFIG.aufschub}|ae^(1)_{CONFIG.alter} = {nax_k_wert:.12f}")
-    
-    # Test Barwert einer temporaeren um m Jahre aufgeschobenen vorschuessigen Leibrente ueber n Jahre
-    print(f"\nBarwert einer temporaeren um {CONFIG.aufschub} Jahre aufgeschobenen vorschuessigen Leibrente ueber {CONFIG.aufschub} Jahre:")
-    nax_k_wert = rbw.m_ae_xn_k(CONFIG.alter, CONFIG.n, CONFIG.aufschub, CONFIG.sex, CONFIG.zins, 1, st)
-    print(f"  {CONFIG.aufschub}|ae^(1)_{CONFIG.alter},{CONFIG.n} = {nax_k_wert:.12f}")
-    
+      
     print("\n" + "=" * 70)
 
 
@@ -262,17 +246,17 @@ def test_leistungsbarwerte(st: rgl.Sterbetafel):
     
     # Test Leistungsbarwert einer konstanten Todesfallleistung der Hoehe 1 mit Eintrittsalter x und Versicherungsdauer n
     print(f"\nLeistungsbarwert einer konstanten Todesfallleistung der Hoehe 1 mit Eintrittsalter {CONFIG.alter} und Versicherungsdauer {CONFIG.n}:")
-    nAx_wert = lbw.nAe_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    nAx_wert = lbw.nAe_x_skalar(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
     print(f"  {CONFIG.n}Ae_{CONFIG.alter} = {nAx_wert:.12f}")
     
     # Test Leistungsbarwert einer Erlebensfallleistung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     print(f"\nLeistungsbarwert einer Erlebensfallleistung der Hoehe 1 mit Eintrittsalter {CONFIG.alter} und Versicherungsdauer {CONFIG.n}")
-    nEx_wert = lbw.nE_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    nEx_wert = lbw.nE_x_skalar(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
     print(f"  {CONFIG.n}E_{CONFIG.alter} = {nEx_wert:.12f}")
 
     # Test Leistungsbarwert einer gemischten Kapitallebensversicherung der Hoehe 1 mit Eintrittsalter alter und Versicherungsdauer n
     print(f"\nLeistungsbarwert einer gemischten Kapitallebensversicherung der Hoehe 1 mit Eintrittsalter {CONFIG.alter} und Versicherungsdauer {CONFIG.n}")
-    Axn_wert = lbw.Ae_xn(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    Axn_wert = lbw.Ae_xn_skalar(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
     print(f"  Ae_{CONFIG.alter},{CONFIG.n} = {Axn_wert:.12f}")
     
     # Kontrolle: Ax:n + Ex:n sollte ungefaehr dem Barwert einer gemischten Versicherung entsprechen
@@ -327,15 +311,15 @@ def test_beispielrechnung(st: rgl.Sterbetafel):
     print("-" * 70)
     
     # Todesfallleistung (verwendet n - Versicherungsdauer)
-    nAe_x_wert = lbw.nAe_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    nAe_x_wert = lbw.nAe_x_skalar(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
     print(f"  nAe_x:  {nAe_x_wert:.12f}  [ueber n={CONFIG.n} Jahre]")
     
     # Erlebensfallleistung (verwendet n - Versicherungsdauer)
-    nE_x_wert = lbw.nE_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    nE_x_wert = lbw.nE_x_skalar(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
     print(f"  nE_x:   {nE_x_wert:.12f}  [nach n={CONFIG.n} Jahren]")
     
     # Beitragsbarwert (verwendet t - Beitragszahldauer)
-    bbw = rbw.ae_xn_k(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, 1, st)
+    bbw = rbw.ae_xn_k_skalar(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, 1, st)
     print(f"  Bbw:    {bbw:.12f}  [ueber t={CONFIG.t} Jahre]")
     
     # Gesamte Leistung
@@ -405,17 +389,17 @@ def test_verlaufswerte(st: rgl.Sterbetafel):
     # Barwerte
     print("\nBBW:")
     for i in range(CONFIG.t):
-        bbw = rbw.ae_xn_k(CONFIG.alter+i, CONFIG.t-i, CONFIG.sex, CONFIG.zins, 1, st)
+        bbw = rbw.ae_xn_k_skalar(CONFIG.alter+i, CONFIG.t-i, CONFIG.sex, CONFIG.zins, 1, st)
         print(f"  ae_{CONFIG.alter+i},{CONFIG.t-i}:  {bbw:.12f}")
     
     print("\nnAe_x:")
     for i in range(CONFIG.n):
-        nAe_x_wert = lbw.nAe_x(CONFIG.alter+i, CONFIG.n-i, CONFIG.sex, CONFIG.zins, st)
+        nAe_x_wert = lbw.nAe_x_skalar(CONFIG.alter+i, CONFIG.n-i, CONFIG.sex, CONFIG.zins, st)
         print(f"  {CONFIG.n-i}Ae_{CONFIG.alter+i}:  {nAe_x_wert:.12f}")
 
     print("\nnE_x:")
     for i in range(CONFIG.n+1):
-        nE_x_wert = lbw.nE_x(CONFIG.alter+i, CONFIG.n-i, CONFIG.sex, CONFIG.zins, st)
+        nE_x_wert = lbw.nE_x_skalar(CONFIG.alter+i, CONFIG.n-i, CONFIG.sex, CONFIG.zins, st)
         print(f"  {CONFIG.n-i}E_{CONFIG.alter+i}:  {nE_x_wert:.12f}")
 
     print("\n" + "=" * 70)

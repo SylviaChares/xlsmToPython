@@ -180,42 +180,33 @@ def test_2_berechnung(st: Sterbetafel) -> Dict[str, np.ndarray]:
 
     start_time = time.time()
     
-    # Beitragsbarwerte
-
-    rentenbarwerte = ae_xn_verlauf_vec(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, CONFIG.zw, st)
+    tpx = bf.tpx_matrix(CONFIG.alter, CONFIG.n, CONFIG.sex, st)
 
     ae_xt_k_opt = rbw.ae_xn_k(CONFIG.alter, CONFIG.t, CONFIG.sex, CONFIG.zins, CONFIG.zw, st)
     ae_xn_k_opt = rbw.ae_xn_k(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, CONFIG.zw, st)
     m_ae_xn_k_opt = rbw.m_ae_xn_k(CONFIG.alter, CONFIG.n, CONFIG.t, CONFIG.sex, CONFIG.zins, CONFIG.zw, st)
 
+    nE_x_opt = lbw.nE_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+    nAe_x_opt = lbw.nAe_x(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+#    Ae_xn_opt = lbw.Ae_xn(CONFIG.alter, CONFIG.n, CONFIG.sex, CONFIG.zins, st)
+
     elapsed = time.time() - start_time
     
     results = {
-        'rentenbarwerte': rentenbarwerte,
-        'ae_xn_k_opt': ae_xn_k_opt,
-        'ae_xt_k_opt': ae_xt_k_opt,
-        'm_ae_xn_k_opt': m_ae_xn_k_opt,
+#        'ae_xn_k_opt': ae_xn_k_opt,
+#        'ae_xt_k_opt': ae_xt_k_opt,
+#        'm_ae_xn_k_opt': m_ae_xn_k_opt,
+#        'nE_x_opt': nE_x_opt,
+#        'nAe_x_opt': nAe_x_opt,
+#        'Ae_xn_opt': Ae_xn_opt,
         'zeit': elapsed
     }
     
-#    print(f"\n✓ Berechnung abgeschlossen")
-#    print(f"  Berechnungszeit: {elapsed:.6f} Sekunden")
-#    print(f"\n ae_xn_k:")
-#    for m in range(min(5, CONFIG.t)):
-#        print(f"  m={m}: ae_{{{CONFIG.alter+m}}}:{CONFIG.t-m} = {rentenbarwerte[m]:.12f}")
-#
-#    print(f"\n ae_xn_k_opt:")
-#    for m in range(min(5, CONFIG.n)):
-#        print(f"  m={m}: ae_{{{CONFIG.alter+m}}}:{CONFIG.n-m} = {ae_xn_k_opt[m]:.12f}")
-#
-#    print(f"\n ae_xt_k_opt:")
-#    for m in range(min(5, CONFIG.t)):
-#        print(f"  m={m}: ae_{{{CONFIG.alter+m}}}:{CONFIG.t-m} = {ae_xt_k_opt[m]:.12f}")
-#
-    print(f"\n m_ae_xn_k_opt:")
-    print(f"  m_ae_xn_k_opt = {m_ae_xn_k_opt}")
-#    for m in range(min(5, CONFIG.n)):
-#        print(f"  m={m}: ae_{{{CONFIG.alter+m}}}:{CONFIG.n-m} = {m_ae_xn_k_opt[m]:.12f}")
+    print(f"\n✓ Berechnung abgeschlossen")
+    print(f"  Berechnungszeit: {elapsed:.6f} Sekunden")
+
+    print(f"\n tpx:")
+    print(f"  tpx = {tpx}")
 
     print("\n" + "=" * 80)
     print("Test 2: abgeschlossen")

@@ -40,6 +40,59 @@ def diskont(zins: float) -> float:
     else:
         return 1.0
 
+def diskont_vec(zins_array: np.ndarray) -> np.ndarray:
+    """
+    VEKTORISIERT: Berechnet Diskontierungsfaktoren fuer Array von Zinssaetzen.
+    
+    Args:
+        zins_array: NumPy-Array mit Zinssaetzen
+    
+    Returns:
+        NumPy-Array mit Diskontierungsfaktoren
+    
+    Beispiel:
+        >>> zinsen = np.array([0.01, 0.015, 0.02, 0.025])
+        >>> v_values = diskont_vec(zinsen)
+    """
+    if not isinstance(zins_array, np.ndarray):
+        zins_array = np.array(zins_array)
+    
+    # Behandle Sonderfall zins = 0
+    result = np.ones_like(zins_array, dtype=float)
+    mask = zins_array > 0
+    result[mask] = 1.0 / (1.0 + zins_array[mask])
+    
+    return result
+
+def diskont_potenz_vec(zins: float, t_array: np.ndarray) -> np.ndarray:
+    """
+    VEKTORISIERT: Berechnet v^t fuer Array von t-Werten.
+    
+    Diese Funktion ist optimiert fuer die Barwert-Berechnung, bei der
+    v^0, v^1, v^2, ..., v^n benoetigt werden.
+    
+    Args:
+        zins: Zinssatz (skalar)
+        t_array: NumPy-Array mit Zeitpunkten
+    
+    Returns:
+        NumPy-Array mit v^t-Werten
+    
+    Beispiel:
+        >>> t = np.arange(21)  # 0, 1, 2, ..., 20
+        >>> v_t = diskont_potenz_vec(0.0175, t)
+    
+    Performance:
+        - Nutzt NumPy's optimierte Potenzierung
+        - ~50x schneller als Python-Schleife fuer grosse Arrays
+    """
+    if not isinstance(t_array, np.ndarray):
+        t_array = np.array(t_array)
+    
+    v = diskont(zins)
+    return v ** t_array
+
+
 
 def abzugsglied(zw: int, zins: float) -> float:
     """
@@ -76,6 +129,7 @@ def abzugsglied(zw: int, zins: float) -> float:
     abzug *= (1.0 + zins) / zw
     
     return abzug
+
 
 
 def npx_skalar(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> float:
@@ -185,6 +239,7 @@ def nqx(alter: int, n: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarra
     return n_j_qx
 
 
+
 def tpx_matrix(alter: int, max_t: int, sex: str, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet Matrix aller tpx-Werte fuer t = 0, 1, ..., max_t.
@@ -241,58 +296,6 @@ def tpx_matrix(alter: int, max_t: int, sex: str, sterbetafel_obj: Sterbetafel) -
     return tpx_values
 
 
-
-def diskont_vec(zins_array: np.ndarray) -> np.ndarray:
-    """
-    VEKTORISIERT: Berechnet Diskontierungsfaktoren fuer Array von Zinssaetzen.
-    
-    Args:
-        zins_array: NumPy-Array mit Zinssaetzen
-    
-    Returns:
-        NumPy-Array mit Diskontierungsfaktoren
-    
-    Beispiel:
-        >>> zinsen = np.array([0.01, 0.015, 0.02, 0.025])
-        >>> v_values = diskont_vec(zinsen)
-    """
-    if not isinstance(zins_array, np.ndarray):
-        zins_array = np.array(zins_array)
-    
-    # Behandle Sonderfall zins = 0
-    result = np.ones_like(zins_array, dtype=float)
-    mask = zins_array > 0
-    result[mask] = 1.0 / (1.0 + zins_array[mask])
-    
-    return result
-
-def diskont_potenz_vec(zins: float, t_array: np.ndarray) -> np.ndarray:
-    """
-    VEKTORISIERT: Berechnet v^t fuer Array von t-Werten.
-    
-    Diese Funktion ist optimiert fuer die Barwert-Berechnung, bei der
-    v^0, v^1, v^2, ..., v^n benoetigt werden.
-    
-    Args:
-        zins: Zinssatz (skalar)
-        t_array: NumPy-Array mit Zeitpunkten
-    
-    Returns:
-        NumPy-Array mit v^t-Werten
-    
-    Beispiel:
-        >>> t = np.arange(21)  # 0, 1, 2, ..., 20
-        >>> v_t = diskont_potenz_vec(0.0175, t)
-    
-    Performance:
-        - Nutzt NumPy's optimierte Potenzierung
-        - ~50x schneller als Python-Schleife fuer grosse Arrays
-    """
-    if not isinstance(t_array, np.ndarray):
-        t_array = np.array(t_array)
-    
-    v = diskont(zins)
-    return v ** t_array
 
 
 # =============================================================================

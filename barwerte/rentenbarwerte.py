@@ -19,10 +19,7 @@ from .basisfunktionen import (
     tpx_matrix, diskont_potenz_vec, verlaufswerte_setup
 )
 
-# =============================================================================
-# Skalare Funktionen (Original - unveraendert)
-# =============================================================================
-
+# Skalare Funktionen 
 def ae_x_skalar(alter: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> float:
     
     if alter <= 0 or alter >= MAX_ALTER:
@@ -96,7 +93,10 @@ def ae_xn_k_skalar(alter: int, n: int, sex: str, zins: float, zw: int, sterbetaf
     
     return axn_wert - abzug * (1.0 - n_px * (v ** n))
 
-def ae_xn_verlauf_vec(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> np.ndarray:
+# Vektorisierte Funktionen
+
+# langsamer
+def ae_xn_vec(alter: int, n: int, sex: str, zins: float, zw: int, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     VEKTORISIERT: Berechnet ALLE Rentenbarwerte ae_{x+t}:n-t fuer t=0..n-1.
     
@@ -185,7 +185,7 @@ def ae_xn_verlauf_vec(alter: int, n: int, sex: str, zins: float, zw: int, sterbe
     
     return rentenbarwerte
 
-
+# optimiert Berechnungsvariante
 def ae_x(alter: int, sex: str, zins: float, sterbetafel_obj: Sterbetafel) -> np.ndarray:
     """
     Berechnet den lebenslangen vorschuessigen Rentenbarwert ae_x.
@@ -434,47 +434,4 @@ def m_ae_xn_k(alter: int, n: int, t: int, sex: str, zins: float, zw: int, sterbe
             np.append(ae_xn_k(alter, t, sex, zins, zw, sterbetafel_obj), np.zeros(n-t)))
 
 
-# =============================================================================
-# Hinweise zur Verwendung
-# =============================================================================
-"""
-PERFORMANCE-GUIDE:
-
-1. EINZELNE Barwerte:
-   Nutze: ae_xn(), ae_xn_k()
-   Einfach und direkt.
-
-2. WENIGE Barwerte (< 5):
-   Nutze: Skalare Funktionen in Schleife
-   Overhead der Vektorisierung lohnt nicht.
-
-3. VERLAUFSWERTE (n ~ 10-50):
-   Nutze: ae_xn_verlauf_vec()
-   Optimale Balance zwischen Geschwindigkeit und Speicher.
-
-4. GROSSE Verlaufswerte (n > 50):
-   Nutze: ae_xn_verlauf_optimized()
-   Maximale Performance.
-
-5. MIT VORBERECHNETEN VEKTOREN:
-   Nutze: ae_xn_vec(setup)
-   Wenn setup schon vorhanden (z.B. fuer mehrere Berechnungen).
-
-BENCHMARK-BEISPIEL (n=20, zw=1):
-
-Standard-Schleife:
-    for i in range(20):
-        bbw = ae_xn_k(alter+i, n-i, sex, zins, 1, st)
-    Zeit: 0.50 Sekunden
-
-ae_xn_verlauf_vec():
-    bbw_array = ae_xn_verlauf_vec(alter, n, sex, zins, 1, st)
-    Zeit: 0.005 Sekunden
-    Speedup: 100x
-
-ae_xn_verlauf_optimized():
-    bbw_array = ae_xn_verlauf_optimized(alter, n, sex, zins, 1, st)
-    Zeit: 0.002 Sekunden
-    Speedup: 250x
-"""
 
