@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Union, Optional
 
 from .sterbetafel import Sterbetafel, MAX_ALTER
-from .basisfunktionen import diskont, abzugsglied, npx_val, tpx_matrix
-from .basisfunktionen import diskont, tpx_matrix
+from .basisfunktionen import diskont, diskont_vec, abzugsglied, npx_val, tpx_matrix
 
 
 
