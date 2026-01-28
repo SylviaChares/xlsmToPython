@@ -36,6 +36,9 @@ Thumbs.db
 *.log
 *.tmp
 
+# Hilfsdateien
+help/
+
 # Optional: große Daten/Exportdateien (nur falls du sie NICHT versionieren willst)
 # *.xlsx
 # *.xlsm

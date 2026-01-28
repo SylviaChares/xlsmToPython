@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Union, Optional
 
 from .sterbetafel import Sterbetafel, MAX_ALTER
-from .basisfunktionen import diskont, tpx_matrix
+from .basisfunktionen import diskont, tpx_matrix 
 
 
 # # Vektorisierte Funktionen - optimiert Berechnungsvariante
